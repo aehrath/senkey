@@ -1,0 +1,180 @@
+# SenKey Chrome Web Store Listing
+
+Use the text below for the Chrome Web Store listing. It is written to match the current SenKey feature set and deployment model.
+
+## Extension name
+
+SenKey
+
+## Short description
+
+Store and autofill passwords from your own backend with Google sign-in and client-side encryption.
+
+## Detailed description
+
+SenKey is a self-hosted password storage and autofill extension for Chrome and other Chromium-based browsers.
+
+Instead of locking your credentials into a third-party password manager service, SenKey lets you keep control of your own backend while still giving you a fast, practical browser autofill experience.
+
+SenKey is built for people and teams who want:
+
+- their own server or cloud backend
+- Google account based user separation
+- client-side password encryption before upload
+- saved login URLs for reopening the correct sign-in page later
+- a lightweight, focused password fill workflow
+
+How SenKey works:
+
+1. You sign in to the extension with Google.
+2. You connect the extension to your own SenKey backend with an API URL and API key.
+3. When you save a credential, SenKey encrypts the password in the browser before it is uploaded.
+4. SenKey stores credentials per signed-in Google user on your backend.
+5. When you click a saved credential, SenKey can fill the current login page or navigate to the saved login page and autofill there.
+
+Key features:
+
+- Self-hosted credential storage
+  Use your own backend instead of relying on a hosted password vault service.
+
+- Client-side password encryption
+  Passwords are encrypted in the extension before they are sent to the server.
+
+- Google sign-in
+  SenKey uses Google sign-in to separate data by user.
+
+- Login URL memory
+  SenKey can save the full login page URL, not just a domain, so it can reopen the correct sign-in page later.
+
+- Navigation plus autofill
+  If you are not already on the right login page, SenKey can open the saved login page and autofill after navigation.
+
+- Support for modern login flows
+  SenKey includes logic for many standard, SPA, shadow DOM, and multi-step login forms.
+
+- Credential editing
+  Update usernames, passwords, domains, and saved login URLs directly from the popup.
+
+- Built-in help
+  The extension includes a built-in help page for setup and daily use.
+
+Who SenKey is for:
+
+- developers who want to host their own password backend
+- small teams who want a lightweight private credential workflow
+- users who prefer a simple extension backed by infrastructure they control
+
+Important note:
+
+SenKey is not a zero-setup consumer password manager. It requires you to connect the extension to your own backend or a backend deployed for you. If you want complete control over where your credential data lives, that is the point.
+
+Typical setup:
+
+- deploy the SenKey backend to your own PHP host or Google Cloud Run
+- sign in with Google inside the extension
+- paste the backend API URL and API key into SenKey settings
+- save credentials and use the `Fill` tab to autofill them later
+
+SenKey is designed to stay focused:
+
+- save credentials
+- reopen the correct login page
+- autofill reliably
+- keep your backend under your control
+
+## Category suggestion
+
+Productivity
+
+## Store tags / keywords
+
+- password manager
+- self hosted
+- autofill
+- login manager
+- credentials
+- cloud run
+- php backend
+- secure storage
+
+## Single purpose statement
+
+SenKey stores encrypted website credentials on a user-controlled backend and autofills them on login pages.
+
+## Permissions justification
+
+### `identity`
+
+Used for Google sign-in so SenKey can separate stored credentials by signed-in user.
+
+### `storage`
+
+Used to save extension settings, local encryption keys, and lightweight local extension state.
+
+### `activeTab`
+
+Used to interact with the currently open page when the user asks SenKey to autofill a credential.
+
+### `scripting`
+
+Used to inject autofill logic into the current page after the user selects a saved credential.
+
+### Host permissions: `https://*/*` and `http://*/*`
+
+Used only so SenKey can fill login forms on sites the user chooses to use with the extension.
+
+## Privacy disclosure draft
+
+SenKey is designed so the user controls the backend that stores credential data.
+
+What SenKey handles:
+
+- Google account identity for user sign-in
+- backend API URL and API key entered by the user
+- encrypted credential records stored on the user’s chosen backend
+- local encryption keys stored in the browser profile
+
+What SenKey does not do:
+
+- SenKey does not run a shared hosted credential storage service
+- SenKey does not require sending plaintext passwords to a SenKey-operated cloud service
+
+## Support URL suggestion
+
+Use the project repository README or your project website.
+
+Suggested support URL:
+
+[https://github.com/your-org-or-user/SenKey-autofill-extension](https://github.com/your-org-or-user/SenKey-autofill-extension)
+
+## Homepage URL suggestion
+
+Use the same repository or a product landing page if you have one.
+
+## Promotional text ideas
+
+### Option 1
+
+Control your own credential backend without giving up browser autofill convenience.
+
+### Option 2
+
+Self-hosted password autofill with Google sign-in, encrypted storage, and saved login pages.
+
+### Option 3
+
+Your backend. Your credentials. Fast login autofill in Chrome.
+
+## Screenshot ideas
+
+1. Fill tab showing saved credentials for a site
+2. Add tab with `Domain`, `Username / Email`, `Password`, and `Login URL`
+3. Settings tab with Google sign-in and server configuration
+4. Built-in Help page
+5. A before-and-after autofill example on a login page
+
+## Submission notes
+
+- Make sure the published extension uses the intended OAuth client ID.
+- Confirm the help page and settings text match the final store copy.
+- Keep the screenshots focused on visible user-facing features, not backend code or deployment scripts.

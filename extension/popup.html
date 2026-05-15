@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SenKey</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f0f11;
+    --surface:   #1a1a1f;
+    --border:    #2a2a32;
+    --accent:    #7c6af7;
+    --accent2:   #56cfb2;
+    --danger:    #e05c5c;
+    --text:      #e8e8f0;
+    --muted:     #6e6e85;
+    --success:   #56cfb2;
+    --radius:    8px;
+    --font-ui:   "SF Pro Text", "Avenir Next", "Segoe UI Variable", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-code: "SF Mono", "JetBrains Mono", "IBM Plex Mono", "Menlo", "Consolas", monospace;
+  }
+
+  body {
+    width: 340px;
+    min-height: 400px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .logo-icon {
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+  .tab-btn.active { color: var(--accent); }
+  .help-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .help-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent2);
+  }
+
+  /* ---- Panels ---- */
+  .panel { display: none; padding: 12px 16px; }
+  .panel.active { display: block; }
+
+  /* ---- Current site banner ---- */
+  .site-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .site-dot {
+    width: 7px; height: 7px;
+    background: var(--accent2);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .site-domain {
+    font-family: var(--font-code);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---- Credential cards ---- */
+  .cred-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .cred-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.15s;
+    cursor: pointer;
+  }
+  .cred-card:hover { border-color: var(--accent); }
+  .cred-card.match { border-color: var(--accent2); }
+
+  .cred-avatar {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    background: #ffffff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600;
+    font-size: 13px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(15, 15, 17, 0.08);
+  }
+  .cred-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+  .cred-avatar-fallback {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+  .cred-info { flex: 1; min-width: 0; }
+  .cred-domain {
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cred-user {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-code);
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cred-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .btn-icon {
+    width: 28px; height: 28px;
+    border-radius: 5px;
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    font-size: 14px;
+  }
+  .btn-icon:hover { background: var(--border); color: var(--text); }
+  .btn-icon.fill:hover { background: var(--accent); color: #fff; }
+  .btn-icon.del:hover  { background: var(--danger); color: #fff; }
+
+  /* ---- Form ---- */
+  .form-group { margin-bottom: 10px; }
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  input[type="text"],
+  input[type="password"],
+  input[type="url"] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 11px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .pass-wrap { position: relative; }
+  .pass-wrap input { padding-right: 34px; }
+  .toggle-pass {
+    position: absolute;
+    right: 8px; top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+    line-height: 1;
+  }
+
+  /* ---- Buttons ---- */
+  .btn {
+    width: 100%;
+    padding: 9px;
+    border-radius: var(--radius);
+    border: none;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #9585ff; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .form-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .form-actions .btn {
+    width: auto;
+    flex: 1;
+  }
+
+  /* ---- Toast ---- */
+  .toast {
+    position: fixed;
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 999;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.ok   { border-color: var(--success); color: var(--success); }
+  .toast.err  { border-color: var(--danger);  color: var(--danger);  }
+
+  /* ---- Empty state ---- */
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 28px 0 16px;
+    font-size: 12px;
+  }
+  .empty-icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* ---- Section title ---- */
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    margin-bottom: 8px;
+  }
+
+  /* Settings note */
+  .note {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+  .note code {
+    font-family: 'DM Mono', monospace;
+    background: var(--surface);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .key-actions { display: flex; gap: 8px; }
+
+  /* ---- Google sign-in ---- */
+  .btn-google {
+    width: 100%;
+    padding: 9px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.2px;
+  }
+  .btn-google:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-google:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .user-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px;
+    flex-shrink: 0;
+  }
+  .user-details { flex: 1; min-width: 0; }
+  .user-name {
+    font-size: 12px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .user-email {
+    font-size: 11px; color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🔑</div>
+    SenKey
+    <span id="versionBadge" style="font-size:10px;font-weight:400;color:var(--muted);margin-left:2px"></span>
+  </div>
+  <div class="header-actions">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="autofill">Fill</button>
+      <button class="tab-btn" data-tab="add">Add</button>
+      <button class="tab-btn" data-tab="settings">⚙</button>
+    </div>
+    <button class="help-btn" id="openHelpBtn" title="Open User Manual">Help</button>
+  </div>
+</div>
+
+<!-- AUTOFILL TAB -->
+<div class="panel active" id="tab-autofill">
+  <div class="site-banner">
+    <div class="site-dot"></div>
+    <div class="site-domain" id="currentDomain">Loading…</div>
+  </div>
+  <div class="section-title">Your credentials</div>
+  <div class="cred-list" id="credList">
+    <div class="empty"><div class="empty-icon">🔒</div>Loading…</div>
+  </div>
+</div>
+
+<!-- ADD TAB -->
+<div class="panel" id="tab-add">
+  <div class="section-title" id="addSectionTitle">Save new credential</div>
+  <div class="form-group">
+    <label>Domain</label>
+    <input type="text" id="addDomain" placeholder="example.com">
+  </div>
+  <div class="form-group">
+    <label>Username / Email</label>
+    <input type="text" id="addUsername" placeholder="you@example.com" autocomplete="username" list="savedUsernames">
+    <datalist id="savedUsernames"></datalist>
+  </div>
+  <div class="form-group">
+    <label>Password</label>
+    <div class="pass-wrap">
+      <input type="password" id="addPassword" placeholder="••••••••">
+      <button class="toggle-pass" id="togglePass">👁</button>
+    </div>
+  </div>
+  <div class="form-group">
+    <label>Login URL</label>
+    <input type="url" id="addLoginUrl" placeholder="https://example.com/login">
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" id="saveBtn">Save to Server</button>
+    <button class="btn btn-secondary" id="cancelEditBtn" style="display:none">Cancel</button>
+  </div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div class="panel" id="tab-settings">
+  <div class="section-title">Google Account</div>
+  <div id="signedOut">
+    <button class="btn-google" id="signInBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div class="note" style="margin-top:6px">Required to access your credentials on the server.</div>
+  </div>
+  <div id="signedIn" style="display:none">
+    <div class="user-card">
+      <div class="user-avatar" id="userInitial">?</div>
+      <div class="user-details">
+        <div class="user-name" id="userName"></div>
+        <div class="user-email" id="userEmail"></div>
+      </div>
+      <button class="btn-icon" id="signOutBtn" title="Sign out">✕</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-title">Server Configuration</div>
+  <div class="form-group">
+    <label>API URL</label>
+    <input type="url" id="serverUrl" placeholder="https://senkey-api-xxxxx.run.app">
+  </div>
+  <div class="form-group">
+    <label>API Key</label>
+    <div class="pass-wrap">
+      <input type="password" id="apiKey" placeholder="Your secret API key">
+      <button class="toggle-pass" id="toggleKey">👁</button>
+    </div>
+  </div>
+  <button class="btn btn-primary" id="saveSettings">Save Settings</button>
+  <div class="note">
+    Paste the backend <code>API URL</code> and <code>API Key</code> from your SenKey deployment.
+    Use <code>https://</code> for the API URL.
+  </div>
+  <div class="divider"></div>
+  <div class="section-title">Encryption Keys</div>
+  <div class="key-actions">
+    <button class="btn btn-secondary" id="exportKeyBtn">Export Keys</button>
+    <label class="btn btn-secondary" for="importKeyFile">Import Keys</label>
+    <input type="file" id="importKeyFile" accept=".json" style="display:none">
+  </div>
+  <div class="note" style="margin-top:8px">Back up your keys or copy them to another device. Keep the export file private — it contains your private key.</div>
+
+  <div class="divider"></div>
+  <div class="section-title">Quick fill on this page</div>
+  <p class="note">Click the fill icon (▶) next to any saved credential in the <strong>Fill</strong> tab to auto-fill the current page's login form.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>

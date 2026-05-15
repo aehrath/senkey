@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+
+# Secrets — never commit this
+.env
+extension.dev.pem
+
+# Build output
+dist/
+senkey.zip
+senkey-deploy/
+senkey-deploy.zip

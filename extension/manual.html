@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SenKey Help</title>
+  <style>
+    :root {
+      --bg: #f7f4ec;
+      --card: #fffdf7;
+      --text: #1d1a14;
+      --muted: #6d6557;
+      --line: #ddd3c1;
+      --accent: #0f766e;
+      --accent-2: #c77d2b;
+      --shadow: 0 20px 50px rgba(40, 28, 10, 0.08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(199, 125, 43, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.1), transparent 32%),
+        var(--bg);
+      color: var(--text);
+      font: 16px/1.6 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 40px 20px 64px;
+    }
+    .hero, .section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px 28px 24px;
+      margin-bottom: 20px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-size: 15px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: inline-block;
+      object-fit: contain;
+      box-shadow: 0 10px 24px rgba(15, 118, 110, 0.14);
+    }
+    h1 {
+      margin: 18px 0 12px;
+      font-size: 38px;
+      line-height: 1.1;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 24px;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 18px;
+    }
+    p { margin: 10px 0; }
+    ol, ul { margin: 10px 0 0 22px; padding: 0; }
+    li { margin: 6px 0; }
+    code {
+      background: rgba(109, 101, 87, 0.1);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.95em;
+    }
+    .lede {
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 62ch;
+    }
+    .banner {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: rgba(15, 118, 110, 0.08);
+      border-radius: 12px;
+    }
+    .section {
+      padding: 22px 24px;
+      margin-bottom: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: white;
+    }
+    .tile strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+    .warn {
+      border-left: 4px solid var(--accent-2);
+      background: rgba(199, 125, 43, 0.08);
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-top: 12px;
+    }
+    .footer {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="brand">
+        <img class="brand-icon" src="icons/icon48.png" alt="SenKey logo">
+        SenKey
+      </div>
+      <h1>SenKey Help</h1>
+      <p class="lede">This guide explains how to use SenKey using only the screens and controls visible in the extension popup.</p>
+      <div class="banner" id="installNote">
+        This help page is built into the extension so you can reopen it any time from the popup header.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Initial setup</h2>
+      <ol>
+        <li>Click the SenKey icon in your browser toolbar.</li>
+        <li>Open <code>⚙</code>.</li>
+        <li>In <code>Google Account</code>, click <code>Sign in with Google</code>.</li>
+        <li>Complete the Google sign-in window.</li>
+        <li>In <code>Server Configuration</code>, enter your <code>API URL</code>.</li>
+        <li>Enter your <code>API Key</code>.</li>
+        <li>Click <code>Save Settings</code>.</li>
+      </ol>
+      <p>After this is done, SenKey is ready to fetch, save, and fill your credentials.</p>
+    </section>
+
+    <section class="section">
+      <h2>Popup overview</h2>
+      <div class="grid">
+        <div class="tile">
+          <strong><code>Fill</code></strong>
+          View saved credentials for the current site and autofill them.
+        </div>
+        <div class="tile">
+          <strong><code>Add</code></strong>
+          Save a new credential or update an existing one.
+        </div>
+        <div class="tile">
+          <strong><code>⚙</code></strong>
+          Sign in, configure the server, and manage encryption keys.
+        </div>
+        <div class="tile">
+          <strong><code>Help</code></strong>
+          Reopen this page later from the popup header.
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Fill tab</h2>
+      <p>The <code>Fill</code> tab shows the current site and any saved credentials that match it.</p>
+      <p>Each credential card shows:</p>
+      <ul>
+        <li>the website icon</li>
+        <li>the saved domain</li>
+        <li>a <code>▶</code> fill button</li>
+        <li>a <code>✎</code> edit button</li>
+        <li>a <code>✕</code> delete button</li>
+      </ul>
+
+      <h3>Fill a credential</h3>
+      <p>Click the card or the <code>▶</code> button. SenKey will fill the current login page or open the saved login page and fill there.</p>
+
+      <h3>Edit a credential</h3>
+      <p>Click <code>✎</code>. SenKey opens the credential in the <code>Add</code> tab with the current values prefilled.</p>
+
+      <h3>Delete a credential</h3>
+      <p>Click <code>✕</code>. If deletion succeeds, SenKey shows <code>Deleted</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>Add tab</h2>
+      <p>Use the <code>Add</code> tab to save a new credential or update an existing one.</p>
+      <p>Visible fields:</p>
+      <ul>
+        <li><code>Domain</code></li>
+        <li><code>Username / Email</code></li>
+        <li><code>Password</code></li>
+        <li><code>Login URL</code></li>
+      </ul>
+
+      <h3>Save a new credential</h3>
+      <ol>
+        <li>Open <code>Add</code>.</li>
+        <li>Enter the site in <code>Domain</code>.</li>
+        <li>Enter your username or email.</li>
+        <li>Enter your password.</li>
+        <li>Optionally keep or change <code>Login URL</code>.</li>
+        <li>Click <code>Save to Server</code>.</li>
+      </ol>
+
+      <h3>Update an existing credential</h3>
+      <ol>
+        <li>Start from <code>Fill</code>.</li>
+        <li>Click <code>✎</code> on a saved credential.</li>
+        <li>Edit the values you want to change.</li>
+        <li>Click <code>Update Credential</code>.</li>
+      </ol>
+
+      <h3>Password visibility</h3>
+      <p>Click the <code>👁</code> button next to the password field to show or hide the password.</p>
+    </section>
+
+    <section class="section">
+      <h2>Settings tab</h2>
+      <h3>Google Account</h3>
+      <p>If you are signed out, you will see <code>Sign in with Google</code>. If you are signed in, you will see your profile initial, your name, your email, and a <code>✕</code> sign-out button.</p>
+      <p>If Brave shows a <code>400 invalid_request</code> Google sign-in error, open <code>brave://settings/extensions</code>, enable <code>Allow Google login for extensions</code>, sign into Google in a normal Brave tab, reload SenKey, and try signing in again.</p>
+
+      <h3>Server Configuration</h3>
+      <p>Enter <code>API URL</code> and <code>API Key</code>, then click <code>Save Settings</code>.</p>
+
+      <h3>Encryption Keys</h3>
+      <p>Use <code>Export Keys</code> and <code>Import Keys</code> to back up or restore your SenKey encryption keys.</p>
+
+      <div class="warn">
+        <strong>Keep exported keys safe.</strong>
+        SenKey uses these keys to decrypt your saved passwords. If they are lost and your browser storage is gone, you may not be able to recover your saved passwords. Anyone with this key file may be able to read the passwords protected by it.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Messages you may see</h2>
+      <div class="grid">
+        <div class="tile">
+          <strong>Success</strong>
+          <code>✓ Filled!</code><br>
+          <code>✓ Saved to server</code><br>
+          <code>✓ Credential updated</code><br>
+          <code>✓ Settings saved</code>
+        </div>
+        <div class="tile">
+          <strong>Other messages</strong>
+          <code>Deleted</code><br>
+          <code>Signed out</code><br>
+          <code>Keys exported</code><br>
+          <code>Updated saved login URL</code>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Typical daily use</h2>
+      <ol>
+        <li>Open the site you want to sign in to.</li>
+        <li>Open SenKey.</li>
+        <li>In <code>Fill</code>, click the matching credential.</li>
+        <li>If you need to save a new login, use <code>Add</code>.</li>
+        <li>If you need to change a password later, use <code>✎</code> from <code>Fill</code>.</li>
+      </ol>
+    </section>
+
+    <p class="footer">You can reopen this page any time from the popup header with <code>Help</code>.</p>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const reason = params.get("reason");
+    const note = document.getElementById("installNote");
+    if (reason === "install") {
+      note.textContent = "Welcome to SenKey. Complete the setup steps below before trying to save or fill credentials.";
+    } else if (reason === "update") {
+      note.textContent = "SenKey was updated. This page is a quick refresher on setup and daily use.";
+    } else if (reason === "help") {
+      note.textContent = "You opened this page from the SenKey Help button. Use it any time you want a quick refresher.";
+    }
+  </script>
+</body>
+</html>
