@@ -3,6 +3,8 @@
 let allCredentials = [];
 let currentDomain  = '';
 let editingCredential = null;
+let folderAssignments = {};
+const collapsedFolders = new Set();
 const SPECIAL_LOGIN_URLS = {
   'auth.digikey.com': 'https://www.digikey.com/MyDigiKey/Login?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2F',
   'www.digikey.com': 'https://www.digikey.com/MyDigiKey/Login?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2F',
@@ -19,6 +21,32 @@ async function setLoginUrlOverride(id, loginUrl) {
   const loginUrlOverrides = await getLoginUrlOverrides();
   loginUrlOverrides[id] = loginUrl;
   await chrome.storage.local.set({ loginUrlOverrides });
+}
+
+async function getFolderAssignments() {
+  const { folderAssignments: fa } = await chrome.storage.local.get('folderAssignments');
+  return fa || {};
+}
+
+async function setFolderAssignment(id, folder) {
+  if (!id) return;
+  const fa = await getFolderAssignments();
+  if (folder) fa[id] = folder;
+  else delete fa[id];
+  await chrome.storage.local.set({ folderAssignments: fa });
+}
+
+function updateFolderSuggestions() {
+  const list = document.getElementById('savedFolders');
+  if (!list) return;
+  const names = [...new Set(Object.values(folderAssignments))].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' })
+  );
+  list.replaceChildren(...names.map(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    return option;
+  }));
 }
 
 async function removeLoginUrlOverride(id) {
@@ -128,6 +156,7 @@ function resetCredentialForm() {
   document.getElementById('addUsername').value = '';
   document.getElementById('addPassword').value = '';
   document.getElementById('addLoginUrl').value = '';
+  document.getElementById('addFolder').value = '';
 }
 
 function updateUsernameSuggestions() {
@@ -156,6 +185,7 @@ function startEditingCredential(cred) {
   document.getElementById('addUsername').value = cred.username || '';
   document.getElementById('addPassword').value = cred.password || '';
   document.getElementById('addLoginUrl').value = cred.loginUrl || '';
+  document.getElementById('addFolder').value = folderAssignments[cred.id] || '';
   showAddTab();
 }
 
@@ -261,7 +291,9 @@ async function loadCredentials() {
     allCredentials = (res.credentials || []).map(cred =>
       overrides[cred.id] ? { ...cred, loginUrl: overrides[cred.id] } : cred
     );
+    folderAssignments = await getFolderAssignments();
     updateUsernameSuggestions();
+    updateFolderSuggestions();
     renderCredentials();
   } catch (err) {
     list.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
@@ -284,11 +316,23 @@ function renderCredentials() {
   });
 
   list.innerHTML = '';
-  sorted.forEach(cred => {
+
+  const groups = new Map();
+  const ungrouped = [];
+  for (const cred of sorted) {
+    const folder = folderAssignments[cred.id];
+    if (folder) {
+      if (!groups.has(folder)) groups.set(folder, []);
+      groups.get(folder).push(cred);
+    } else {
+      ungrouped.push(cred);
+    }
+  }
+
+  function makeCard(cred) {
     const isMatch = isCredentialMatch(currentDomain, cred.domain);
     const initials = (cred.domain[0] || '?').toUpperCase();
     const faviconUrl = getFaviconUrl(cred);
-
     const card = document.createElement('div');
     card.className = 'cred-card' + (isMatch ? ' match' : '');
     card.innerHTML = `
@@ -298,14 +342,12 @@ function renderCredentials() {
       </div>
       <div class="cred-info">
         <div class="cred-domain">${escHtml(cred.domain)}</div>
-<!--        <div class="cred-user">${escHtml(cred.username)}</div>-->
       </div>
       <div class="cred-actions">
         <button class="btn-icon fill" title="Autofill this page">▶</button>
         <button class="btn-icon edit" title="Update username/password">✎</button>
         <button class="btn-icon del"  title="Delete">✕</button>
       </div>`;
-
     const avatarImg = card.querySelector('.cred-avatar img');
     const avatarFallback = card.querySelector('.cred-avatar-fallback');
     if (!faviconUrl) {
@@ -317,23 +359,42 @@ function renderCredentials() {
         avatarFallback.style.display = 'flex';
       }, { once: true });
     }
-
-    card.querySelector('.fill').addEventListener('click', e => {
-      e.stopPropagation();
-      autofillPage(cred);
-    });
-    card.querySelector('.edit').addEventListener('click', e => {
-      e.stopPropagation();
-      startEditingCredential(cred);
-    });
-    card.querySelector('.del').addEventListener('click', e => {
-      e.stopPropagation();
-      deleteCredential(cred.id);
-    });
+    card.querySelector('.fill').addEventListener('click', e => { e.stopPropagation(); autofillPage(cred); });
+    card.querySelector('.edit').addEventListener('click', e => { e.stopPropagation(); startEditingCredential(cred); });
+    card.querySelector('.del').addEventListener('click',  e => { e.stopPropagation(); deleteCredential(cred.id); });
     card.addEventListener('click', () => autofillPage(cred));
+    return card;
+  }
 
-    list.appendChild(card);
-  });
+  const sortedFolderNames = [...groups.keys()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  for (const folderName of sortedFolderNames) {
+    const section = document.createElement('div');
+    section.className = 'folder-section';
+    const isCollapsed = collapsedFolders.has(folderName);
+    const header = document.createElement('div');
+    header.className = 'folder-header';
+    header.innerHTML = `<span class="folder-toggle${isCollapsed ? ' collapsed' : ''}">▼</span> ${escHtml(folderName)} <span style="color:var(--border)">(${groups.get(folderName).length})</span>`;
+    const cards = document.createElement('div');
+    cards.className = 'folder-cards' + (isCollapsed ? ' hidden' : '');
+    header.addEventListener('click', () => {
+      const tog = header.querySelector('.folder-toggle');
+      if (collapsedFolders.has(folderName)) {
+        collapsedFolders.delete(folderName);
+        tog.classList.remove('collapsed');
+        cards.classList.remove('hidden');
+      } else {
+        collapsedFolders.add(folderName);
+        tog.classList.add('collapsed');
+        cards.classList.add('hidden');
+      }
+    });
+    for (const cred of groups.get(folderName)) cards.appendChild(makeCard(cred));
+    section.appendChild(header);
+    section.appendChild(cards);
+    list.appendChild(section);
+  }
+
+  for (const cred of ungrouped) list.appendChild(makeCard(cred));
 }
 
 // ---- Autofill ----
@@ -652,6 +713,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const username = document.getElementById('addUsername').value.trim();
   const password = document.getElementById('addPassword').value.trim();
   const loginUrl = document.getElementById('addLoginUrl').value.trim();
+  const folder   = document.getElementById('addFolder').value.trim();
 
   if (!domain || !username || !password) {
     return showToast('All fields are required', 'err');
@@ -674,10 +736,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (res.error) throw new Error(res.error);
     if (loginUrl && res.id) await setLoginUrlOverride(res.id, canonicalLoginUrl(loginUrl));
     if (!loginUrl && res.id) await removeLoginUrlOverride(res.id);
+    if (res.id) await setFolderAssignment(res.id, folder);
     if (editingCredential && editingCredential.id && editingCredential.id !== res.id) {
       const delRes = await chrome.runtime.sendMessage({ type: 'DELETE_CREDENTIAL', id: editingCredential.id });
       if (delRes?.error) throw new Error(delRes.error);
       await removeLoginUrlOverride(editingCredential.id);
+      await setFolderAssignment(editingCredential.id, '');
     }
     showToast(editingCredential ? '✓ Credential updated' : '✓ Saved to server', 'ok');
     resetCredentialForm();
@@ -703,6 +767,7 @@ async function deleteCredential(id) {
     const res = await chrome.runtime.sendMessage({ type: 'DELETE_CREDENTIAL', id });
     if (res.error) throw new Error(res.error);
     await removeLoginUrlOverride(id);
+    await setFolderAssignment(id, '');
     showToast('Deleted', 'ok');
     await loadCredentials();
   } catch (err) {

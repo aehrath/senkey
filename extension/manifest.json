@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SenKey",
-  "version": "1.2.15",
+  "version": "1.2.16",
   "description": "Store and autofill passwords from your own backend with Google sign-in and client-side encryption.",
   "permissions": [
     "activeTab",
@@ -10,7 +10,7 @@
     "identity"
   ],
   "oauth2": {
-    "client_id": "456135155814-qgt4cb89sv1vsgtl4jtljev698tbhdjp.apps.googleusercontent.com",
+    "client_id": "456135155814-6vbckdu5beemnfbajrehs6l5diehhaim.apps.googleusercontent.com",
     "scopes": [
       "openid",
       "email",

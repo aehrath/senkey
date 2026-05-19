@@ -318,6 +318,28 @@
   }
   .empty-icon { font-size: 28px; margin-bottom: 8px; }
 
+  /* ---- Folder sections ---- */
+  .folder-section { margin-bottom: 4px; }
+  .folder-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 2px 3px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    user-select: none;
+    border-radius: 4px;
+  }
+  .folder-header:hover { color: var(--text); }
+  .folder-toggle { font-size: 9px; transition: transform 0.15s; display: inline-block; }
+  .folder-toggle.collapsed { transform: rotate(-90deg); }
+  .folder-cards { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+  .folder-cards.hidden { display: none; }
+
   /* ---- Section title ---- */
   .section-title {
     font-size: 11px;
@@ -458,6 +480,11 @@
   <div class="form-group">
     <label>Login URL</label>
     <input type="url" id="addLoginUrl" placeholder="https://example.com/login">
+  </div>
+  <div class="form-group">
+    <label>Folder</label>
+    <input type="text" id="addFolder" placeholder="Optional folder name" list="savedFolders" autocomplete="off">
+    <datalist id="savedFolders"></datalist>
   </div>
   <div class="form-actions">
     <button class="btn btn-primary" id="saveBtn">Save to Server</button>

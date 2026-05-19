@@ -130,3 +130,24 @@ if [ "${1}" = "prod" ]; then
 else
   echo "✅  Dev build: dist/  (load as unpacked from chrome://extensions)"
 fi
+
+echo ""
+echo "── Extension settings ──────────────────────────────"
+SERVICE_URL=""
+if command -v gcloud &>/dev/null && [ -n "${PROJECT_ID:-}" ] && [ "$PROJECT_ID" != "your-gcp-project-id" ]; then
+  SERVICE_URL=$(gcloud run services describe senkey-api \
+    --region "${REGION:-us-west1}" \
+    --project "$PROJECT_ID" \
+    --format "value(status.url)" 2>/dev/null || true)
+fi
+if [ -n "$SERVICE_URL" ]; then
+  echo "  API URL : $SERVICE_URL"
+else
+  echo "  API URL : (not deployed yet — run ./deploy.sh)"
+fi
+if [ -n "${API_KEY:-}" ]; then
+  echo "  API Key : $API_KEY"
+else
+  echo "  API Key : (not set — run ./deploy.sh to generate one)"
+fi
+echo "────────────────────────────────────────────────────"
