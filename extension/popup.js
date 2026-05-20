@@ -39,9 +39,17 @@ async function setFolderAssignment(id, folder) {
 function updateFolderSuggestions() {
   const list = document.getElementById('savedFolders');
   if (!list) return;
-  const names = [...new Set(Object.values(folderAssignments))].sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: 'base' })
-  );
+  const allPaths = new Set();
+  for (const path of Object.values(folderAssignments)) {
+    if (!path) continue;
+    const parts = path.split('/').map(p => p.trim()).filter(Boolean);
+    let cum = '';
+    for (const part of parts) {
+      cum = cum ? `${cum}/${part}` : part;
+      allPaths.add(cum);
+    }
+  }
+  const names = [...allPaths].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   list.replaceChildren(...names.map(name => {
     const option = document.createElement('option');
     option.value = name;
@@ -317,18 +325,6 @@ function renderCredentials() {
 
   list.innerHTML = '';
 
-  const groups = new Map();
-  const ungrouped = [];
-  for (const cred of sorted) {
-    const folder = folderAssignments[cred.id];
-    if (folder) {
-      if (!groups.has(folder)) groups.set(folder, []);
-      groups.get(folder).push(cred);
-    } else {
-      ungrouped.push(cred);
-    }
-  }
-
   function makeCard(cred) {
     const isMatch = isCredentialMatch(currentDomain, cred.domain);
     const initials = (cred.domain[0] || '?').toUpperCase();
@@ -366,35 +362,64 @@ function renderCredentials() {
     return card;
   }
 
-  const sortedFolderNames = [...groups.keys()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  for (const folderName of sortedFolderNames) {
+  function buildTree(creds) {
+    const root = { children: {}, creds: [] };
+    for (const cred of creds) {
+      const path = (folderAssignments[cred.id] || '').trim();
+      if (!path) { root.creds.push(cred); continue; }
+      const parts = path.split('/').map(p => p.trim()).filter(Boolean);
+      let node = root;
+      let cum = '';
+      for (const part of parts) {
+        cum = cum ? `${cum}/${part}` : part;
+        if (!node.children[part]) node.children[part] = { children: {}, creds: [], fullPath: cum };
+        node = node.children[part];
+      }
+      node.creds.push(cred);
+    }
+    return root;
+  }
+
+  function countCreds(node) {
+    let n = node.creds.length;
+    for (const child of Object.values(node.children)) n += countCreds(child);
+    return n;
+  }
+
+  function renderNode(name, node) {
     const section = document.createElement('div');
     section.className = 'folder-section';
-    const isCollapsed = collapsedFolders.has(folderName);
+    const fullPath = node.fullPath;
+    const isCollapsed = collapsedFolders.has(fullPath);
     const header = document.createElement('div');
     header.className = 'folder-header';
-    header.innerHTML = `<span class="folder-toggle${isCollapsed ? ' collapsed' : ''}">▼</span> ${escHtml(folderName)} <span style="color:var(--border)">(${groups.get(folderName).length})</span>`;
+    header.innerHTML = `<span class="folder-toggle${isCollapsed ? ' collapsed' : ''}">▼</span> ${escHtml(name)} <span style="color:var(--border)">(${countCreds(node)})</span>`;
     const cards = document.createElement('div');
     cards.className = 'folder-cards' + (isCollapsed ? ' hidden' : '');
     header.addEventListener('click', () => {
       const tog = header.querySelector('.folder-toggle');
-      if (collapsedFolders.has(folderName)) {
-        collapsedFolders.delete(folderName);
+      if (collapsedFolders.has(fullPath)) {
+        collapsedFolders.delete(fullPath);
         tog.classList.remove('collapsed');
         cards.classList.remove('hidden');
       } else {
-        collapsedFolders.add(folderName);
+        collapsedFolders.add(fullPath);
         tog.classList.add('collapsed');
         cards.classList.add('hidden');
       }
     });
-    for (const cred of groups.get(folderName)) cards.appendChild(makeCard(cred));
+    const childNames = Object.keys(node.children).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    for (const childName of childNames) cards.appendChild(renderNode(childName, node.children[childName]));
+    for (const cred of node.creds) cards.appendChild(makeCard(cred));
     section.appendChild(header);
     section.appendChild(cards);
-    list.appendChild(section);
+    return section;
   }
 
-  for (const cred of ungrouped) list.appendChild(makeCard(cred));
+  const root = buildTree(sorted);
+  const topNames = Object.keys(root.children).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  for (const name of topNames) list.appendChild(renderNode(name, root.children[name]));
+  for (const cred of root.creds) list.appendChild(makeCard(cred));
 }
 
 // ---- Autofill ----

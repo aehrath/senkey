@@ -23,8 +23,8 @@
   }
 
   body {
-    width: 340px;
-    min-height: 400px;
+    width: 600px;
+    min-height: 520px;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-ui);
@@ -319,12 +319,13 @@
   .empty-icon { font-size: 28px; margin-bottom: 8px; }
 
   /* ---- Folder sections ---- */
-  .folder-section { margin-bottom: 4px; }
+  .folder-section { margin-bottom: 2px; }
   .folder-header {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px 2px 3px;
+    gap: 8px;
+    height: 40px;
+    padding: 0 12px;
     cursor: pointer;
     color: var(--muted);
     font-size: 11px;
@@ -332,12 +333,24 @@
     text-transform: uppercase;
     letter-spacing: 0.7px;
     user-select: none;
-    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s, color 0.15s;
   }
-  .folder-header:hover { color: var(--text); }
-  .folder-toggle { font-size: 9px; transition: transform 0.15s; display: inline-block; }
+  .folder-header:hover { border-color: var(--accent); color: var(--text); }
+  .folder-toggle { font-size: 9px; transition: transform 0.15s; display: inline-block; flex-shrink: 0; }
   .folder-toggle.collapsed { transform: rotate(-90deg); }
-  .folder-cards { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+  .folder-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+    margin-bottom: 2px;
+    margin-left: 8px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
+  }
   .folder-cards.hidden { display: none; }
 
   /* ---- Section title ---- */
@@ -448,10 +461,7 @@
 
 <!-- AUTOFILL TAB -->
 <div class="panel active" id="tab-autofill">
-  <div class="site-banner">
-    <div class="site-dot"></div>
-    <div class="site-domain" id="currentDomain">Loading…</div>
-  </div>
+  <div id="currentDomain" style="display:none"></div>
   <div class="section-title">Your credentials</div>
   <div class="cred-list" id="credList">
     <div class="empty"><div class="empty-icon">🔒</div>Loading…</div>
