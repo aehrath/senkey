@@ -18,13 +18,13 @@ It is the server-side part of SenKey that:
 
 ## Files in this folder
 
-- [index.php](/Users/aehrath/code/SenKey-autofill-extension/docker/index.php:1)
+- [index.php](index.php)
   The backend API used by the extension.
-- [Dockerfile](/Users/aehrath/code/SenKey-autofill-extension/docker/Dockerfile:1)
+- [Dockerfile](Dockerfile)
   The Cloud Run container definition.
-- [deploy.sh](/Users/aehrath/code/SenKey-autofill-extension/docker/deploy.sh:1)
+- [deploy.sh](deploy.sh)
   The deployment script.
-- [INSTALL.md](/Users/aehrath/code/SenKey-autofill-extension/docker/INSTALL.md:1)
+- [INSTALL.md](INSTALL.md)
   A shorter checklist-style install guide.
 
 ## Before you deploy
@@ -219,6 +219,6 @@ Check that:
 
 ## Related docs
 
-- [README.md](/Users/aehrath/code/SenKey-autofill-extension/README.md:1)
-- [docker/INSTALL.md](/Users/aehrath/code/SenKey-autofill-extension/docker/INSTALL.md:1)
-- [USER-MANUAL.md](/Users/aehrath/code/SenKey-autofill-extension/USER-MANUAL.md:1)
+- [../README.md](../README.md)
+- [INSTALL.md](INSTALL.md)
+- [../USER-MANUAL.md](../USER-MANUAL.md)

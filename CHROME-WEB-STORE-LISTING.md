@@ -22,6 +22,7 @@ SenKey is built for people and teams who want:
 - Google account based user separation
 - client-side password encryption before upload
 - saved login URLs for reopening the correct sign-in page later
+- folder organization for grouping credentials
 - a lightweight, focused password fill workflow
 
 How SenKey works:
@@ -49,11 +50,14 @@ Key features:
 - Navigation plus autofill
   If you are not already on the right login page, SenKey can open the saved login page and autofill after navigation.
 
+- Folder organization
+  Credentials can be assigned to folders so related logins stay grouped and easy to find.
+
 - Support for modern login flows
   SenKey includes logic for many standard, SPA, shadow DOM, and multi-step login forms.
 
 - Credential editing
-  Update usernames, passwords, domains, and saved login URLs directly from the popup.
+  Update usernames, passwords, domains, folders, and saved login URLs directly from the popup.
 
 - Built-in help
   The extension includes a built-in help page for setup and daily use.
@@ -131,7 +135,7 @@ What SenKey handles:
 
 - Google account identity for user sign-in
 - backend API URL and API key entered by the user
-- encrypted credential records stored on the user’s chosen backend
+- encrypted credential records stored on the user's chosen backend
 - local encryption keys stored in the browser profile
 
 What SenKey does not do:
@@ -141,15 +145,11 @@ What SenKey does not do:
 
 ## Support URL suggestion
 
-Use the project repository README or your project website.
-
-Suggested support URL:
-
-[https://github.com/your-org-or-user/SenKey-autofill-extension](https://github.com/your-org-or-user/SenKey-autofill-extension)
+[https://github.com/aehrath/senkey](https://github.com/aehrath/senkey)
 
 ## Homepage URL suggestion
 
-Use the same repository or a product landing page if you have one.
+[https://github.com/aehrath/senkey](https://github.com/aehrath/senkey)
 
 ## Promotional text ideas
 
@@ -167,8 +167,8 @@ Your backend. Your credentials. Fast login autofill in Chrome.
 
 ## Screenshot ideas
 
-1. Fill tab showing saved credentials for a site
-2. Add tab with `Domain`, `Username / Email`, `Password`, and `Login URL`
+1. Fill tab showing saved credentials grouped by folder
+2. Add tab with `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder` fields
 3. Settings tab with Google sign-in and server configuration
 4. Built-in Help page
 5. A before-and-after autofill example on a login page

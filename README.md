@@ -21,9 +21,8 @@ It is built around four ideas:
 ## Project layout
 
 ```text
-SenKey-autofill-extension/
+senkey/
 ├── extension/          Chrome extension source
-├── server/             Simple self-hosted PHP backend
 ├── docker/             Google Cloud Run backend
 ├── build.sh            Extension build script
 ├── deploy.sh           Repo-root Cloud Run deploy wrapper
@@ -36,8 +35,8 @@ SenKey-autofill-extension/
 
 SenKey supports two backend options:
 
-- `server/credentials.php`
-  Best when you already have PHP hosting and want the simplest possible server setup.
+- Self-hosted PHP (`credentials.php`)
+  Best when you already have PHP hosting and want the simplest possible server setup. This is a separate optional component not included in this repository — see [Self-Hosted PHP Deployment](#self-hosted-php-deployment) below.
 - `docker/`
   Best when you want a managed Google Cloud Run deployment with Google Cloud Storage.
 
@@ -86,7 +85,7 @@ cp .env.example .env
 
 ## Cloud Run Deployment
 
-The repo-root [deploy.sh](/Users/aehrath/code/SenKey-autofill-extension/deploy.sh:1) is the standard deployment entry point. It runs [docker/deploy.sh](/Users/aehrath/code/SenKey-autofill-extension/docker/deploy.sh:1) for you.
+`deploy.sh` at the repo root is the standard deployment entry point. It runs `docker/deploy.sh` for you.
 
 What the deploy script does:
 
@@ -119,12 +118,12 @@ You do not need to add `GCS_BUCKET` manually to `.env`.
 
 Detailed Cloud Run docs live in:
 
-- [docker/README.md](/Users/aehrath/code/SenKey-autofill-extension/docker/README.md:1)
-- [docker/INSTALL.md](/Users/aehrath/code/SenKey-autofill-extension/docker/INSTALL.md:1)
+- `docker/README.md`
+- `docker/INSTALL.md`
 
 ## Self-Hosted PHP Deployment
 
-If you want the lightest backend possible, use [server/credentials.php](/Users/aehrath/code/SenKey-autofill-extension/server/credentials.php:1).
+A lightweight single-file PHP backend (`credentials.php`) is available as a separate optional component not included in this repository. It stores one JSON file per Google user and supports `GET`, `POST`, and `DELETE`.
 
 Basic setup:
 
@@ -132,8 +131,6 @@ Basic setup:
 2. Upload the file to an HTTPS-enabled PHP host.
 3. Make sure the directory is writable so per-user JSON files can be created.
 4. Point the extension `API URL` to that endpoint.
-
-The current backend stores one JSON file per Google user and supports `GET`, `POST`, and `DELETE`.
 
 ## Google OAuth Setup
 
@@ -147,8 +144,10 @@ backend and paste the backend `API URL` and `API Key` into the extension.
 Create your own OAuth client only if you build, fork, or load your own copy of
 the extension. For production builds, copy the generated client ID into `.env`
 as `GOOGLE_OAUTH_CLIENT_ID`. For local dev builds, run `./build.sh` once to get
-the stable dev extension ID, create a Chrome Extension OAuth client for that ID,
-then copy the generated client ID into `.env` as `DEV_GOOGLE_OAUTH_CLIENT_ID`.
+the stable dev extension ID — it is printed by `./build.sh` on the
+`🔐  Dev extension ID:` line. Create a Chrome
+Extension OAuth client for that ID, then copy the generated client ID into `.env`
+as `DEV_GOOGLE_OAUTH_CLIENT_ID`.
 
 Google Cloud Console flow:
 
@@ -164,7 +163,7 @@ Google Cloud Console flow:
 gcmgfpkabdjhniklindbjieohnfngchg
 ```
 
-For a dev build, use the dev extension ID printed by `./build.sh` instead.
+For a dev build, run `./build.sh` and use the Extension ID printed on the `🔐  Dev extension ID:` line.
 
 8. Finish creation and copy the generated OAuth client ID.
 9. Put that value into `.env` as `GOOGLE_OAUTH_CLIENT_ID` for production builds,
@@ -199,8 +198,9 @@ Check these items:
 gcmgfpkabdjhniklindbjieohnfngchg
 ```
 
-- If you are loading an unpacked development build, use the dev extension ID
-  printed by `./build.sh` when creating `DEV_GOOGLE_OAUTH_CLIENT_ID`.
+- If you are loading an unpacked development build, run `./build.sh` and use
+  the Extension ID printed on the `🔐  Dev extension ID:` line when creating
+  `DEV_GOOGLE_OAUTH_CLIENT_ID`.
 - After changing `GOOGLE_OAUTH_CLIENT_ID` or `DEV_GOOGLE_OAUTH_CLIENT_ID`, run
   `./build.sh`, reload the extension, and sign in again.
 
@@ -209,7 +209,7 @@ this Chrome extension. Only the generated OAuth client ID belongs in `.env`.
 
 ## Build Commands
 
-Use [build.sh](/Users/aehrath/code/SenKey-autofill-extension/build.sh:1) for extension builds.
+Use `build.sh` for extension builds.
 
 Commands:
 
@@ -250,13 +250,13 @@ First-time setup:
 Daily use:
 
 - `Fill`
-  Click a saved credential to fill the current login page or open the saved login page and fill there.
+  Click a saved credential to fill the current login page or open the saved login page and fill there. Credentials are grouped by folder when folders are assigned.
 - `Add`
-  Save a new credential or update an existing one.
+  Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`.
 - `Help`
   Open the built-in help page.
 
-The full user-facing guide is in [USER-MANUAL.md](/Users/aehrath/code/SenKey-autofill-extension/USER-MANUAL.md:1), and the installed extension also includes its own help page at [extension/manual.html](/Users/aehrath/code/SenKey-autofill-extension/extension/manual.html:1).
+The full user-facing guide is in `USER-MANUAL.md`, and the installed extension also includes its own help page at `extension/manual.html`.
 
 ## Login URL Behavior
 
@@ -274,7 +274,7 @@ SenKey updates login URLs only when it believes the current page is a real login
 
 - Passwords are encrypted client-side before upload.
 - The backend receives encrypted password data, not plaintext passwords.
-- Google sign-in separates one user’s data from another user’s data.
+- Google sign-in separates one user's data from another user's data.
 - The API key acts as a shared server-level gate.
 - Exported SenKey keys are sensitive and should be stored privately.
 
@@ -289,7 +289,6 @@ SenKey updates login URLs only when it believes the current page is a real login
 
 ## Development Notes
 
-- Extension UI and autofill logic live in [extension/popup.js](/Users/aehrath/code/SenKey-autofill-extension/extension/popup.js:1).
-- Background navigation and post-navigation fill logic live in [extension/background.js](/Users/aehrath/code/SenKey-autofill-extension/extension/background.js:1).
-- The simple PHP backend is [server/credentials.php](/Users/aehrath/code/SenKey-autofill-extension/server/credentials.php:1).
-- The Cloud Run backend is [docker/index.php](/Users/aehrath/code/SenKey-autofill-extension/docker/index.php:1).
+- Extension UI and autofill logic live in `extension/popup.js`.
+- Background navigation and post-navigation fill logic live in `extension/background.js`.
+- The Cloud Run backend is `docker/index.php`.

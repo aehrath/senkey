@@ -1,6 +1,6 @@
 # SenKey Cloud Run Install Guide
 
-Use this guide when you want the shortest possible checklist for deploying the SenKey backend to Google Cloud Run.
+Use this guide for the shortest possible checklist for deploying the SenKey backend to Google Cloud Run.
 
 ## Prerequisites
 
@@ -81,18 +81,15 @@ When deploy finishes, copy the printed values into SenKey:
 ## Troubleshooting
 
 - `400 invalid_request` during Google sign-in
-  This comes from extension Google sign-in, not from Cloud Run. In Brave, open
-  `brave://settings/extensions`, enable `Allow Google login for extensions`,
-  sign into Google in a normal Brave tab, reload SenKey, then try again. Brave
-  says the extension login setting has no effect when the browser is not logged
-  into Google. If you use the published SenKey extension unchanged, reinstall or
-  reload the published build and configure only `API URL` and `API Key`. If you
-  build your own extension, create a Google OAuth client with type `Chrome
-  extension` / `Chrome App`, make its Chrome App / Item ID match the installed
-  extension ID, put only the generated client ID in `.env` as
-  `GOOGLE_OAUTH_CLIENT_ID` for production builds or
-  `DEV_GOOGLE_OAUTH_CLIENT_ID` for dev builds, then run `./build.sh` and reload
-  the extension.
+  This comes from extension Google sign-in, not from Cloud Run. Steps to resolve:
+  - In Brave, open `brave://settings/extensions`, enable `Allow Google login for extensions`.
+  - Sign into Google in a normal Brave tab, reload SenKey, then try again.
+    (The extension login setting has no effect when the browser is not logged into Google.)
+  - If you use the published SenKey extension unchanged, reinstall or reload it and configure only `API URL` and `API Key`.
+  - If you build your own extension, create a Google OAuth client with type `Chrome extension` / `Chrome App`.
+    Make its Chrome App / Item ID match the installed extension ID, then put the generated client ID in `.env`
+    as `GOOGLE_OAUTH_CLIENT_ID` for production builds or `DEV_GOOGLE_OAUTH_CLIENT_ID` for dev builds.
+    Run `./build.sh` and reload the extension.
 - `Unauthorized`
   Check that the extension `API Key` matches the deployed `API_KEY`.
 - `Google sign-in required`

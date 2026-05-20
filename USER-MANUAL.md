@@ -33,10 +33,7 @@ The main tabs are:
 
 ## Fill tab
 
-The `Fill` tab shows:
-
-- the current website
-- your saved credentials for that site
+The `Fill` tab shows your saved credentials list.
 
 Each credential appears as a card with:
 
@@ -45,6 +42,10 @@ Each credential appears as a card with:
 - a `▶` fill button
 - a `✎` edit button
 - a `✕` delete button
+
+### Folders
+
+Credentials can be grouped into folders. Folders can be nested using `/` (for example, `Work/Clients`). Folders are collapsible, and their collapsed or expanded state is remembered between sessions.
 
 ### Fill a credential
 
@@ -88,6 +89,7 @@ Visible fields:
 - `Username / Email`
 - `Password`
 - `Login URL`
+- `Folder`
 
 Visible buttons:
 
@@ -95,6 +97,8 @@ Visible buttons:
 - `Update Credential` while editing
 - `Cancel` while editing
 - `👁` next to the password field
+
+The `Folder` field groups the credential under a named folder in the `Fill` tab. Use `/` for nesting (for example, `Work/Clients`). Existing folder names are suggested as you type.
 
 ### Save a new credential
 
