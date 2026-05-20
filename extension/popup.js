@@ -11,6 +11,28 @@ const SPECIAL_LOGIN_URLS = {
   'digikey.com': 'https://www.digikey.com/MyDigiKey/Login?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2F',
 };
 
+const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+
+function populateDatalist(elementId, values) {
+  const list = document.getElementById(elementId);
+  if (!list) return;
+  list.replaceChildren(
+    ...[...new Set(values)].filter(Boolean).sort(byName)
+      .map(v => Object.assign(document.createElement('option'), { value: v }))
+  );
+}
+
+function folderPathParts(path) {
+  const parts = (path || '').trim().split('/').map(p => p.trim()).filter(Boolean);
+  const result = [];
+  let cum = '';
+  for (const part of parts) {
+    cum = cum ? `${cum}/${part}` : part;
+    result.push({ part, fullPath: cum });
+  }
+  return result;
+}
+
 async function getLoginUrlOverrides() {
   const { loginUrlOverrides } = await chrome.storage.local.get('loginUrlOverrides');
   return loginUrlOverrides || {};
@@ -23,38 +45,24 @@ async function setLoginUrlOverride(id, loginUrl) {
   await chrome.storage.local.set({ loginUrlOverrides });
 }
 
-async function getFolderAssignments() {
-  const { folderAssignments: fa } = await chrome.storage.local.get('folderAssignments');
-  return fa || {};
+async function setFolderAssignment(id, folder) {
+  if (!id || !folder) return;
+  folderAssignments[id] = folder;
+  await chrome.storage.local.set({ folderAssignments });
 }
 
-async function setFolderAssignment(id, folder) {
+async function removeFolderAssignment(id) {
   if (!id) return;
-  const fa = await getFolderAssignments();
-  if (folder) fa[id] = folder;
-  else delete fa[id];
-  await chrome.storage.local.set({ folderAssignments: fa });
+  delete folderAssignments[id];
+  await chrome.storage.local.set({ folderAssignments });
 }
 
 function updateFolderSuggestions() {
-  const list = document.getElementById('savedFolders');
-  if (!list) return;
   const allPaths = new Set();
   for (const path of Object.values(folderAssignments)) {
-    if (!path) continue;
-    const parts = path.split('/').map(p => p.trim()).filter(Boolean);
-    let cum = '';
-    for (const part of parts) {
-      cum = cum ? `${cum}/${part}` : part;
-      allPaths.add(cum);
-    }
+    for (const { fullPath } of folderPathParts(path)) allPaths.add(fullPath);
   }
-  const names = [...allPaths].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  list.replaceChildren(...names.map(name => {
-    const option = document.createElement('option');
-    option.value = name;
-    return option;
-  }));
+  populateDatalist('savedFolders', [...allPaths]);
 }
 
 async function removeLoginUrlOverride(id) {
@@ -168,20 +176,7 @@ function resetCredentialForm() {
 }
 
 function updateUsernameSuggestions() {
-  const list = document.getElementById('savedUsernames');
-  if (!list) return;
-
-  const usernames = [...new Set(
-    allCredentials
-      .map(cred => (cred.username || '').trim())
-      .filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-
-  list.replaceChildren(...usernames.map(username => {
-    const option = document.createElement('option');
-    option.value = username;
-    return option;
-  }));
+  populateDatalist('savedUsernames', allCredentials.map(c => (c.username || '').trim()));
 }
 
 function startEditingCredential(cred) {
@@ -299,7 +294,10 @@ async function loadCredentials() {
     allCredentials = (res.credentials || []).map(cred =>
       overrides[cred.id] ? { ...cred, loginUrl: overrides[cred.id] } : cred
     );
-    folderAssignments = await getFolderAssignments();
+    const { folderAssignments: fa, collapsedFolders: cf } = await chrome.storage.local.get(['folderAssignments', 'collapsedFolders']);
+    folderAssignments = fa || {};
+    collapsedFolders.clear();
+    for (const p of (cf || [])) collapsedFolders.add(p);
     updateUsernameSuggestions();
     updateFolderSuggestions();
     renderCredentials();
@@ -307,6 +305,105 @@ async function loadCredentials() {
     list.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
     updateUsernameSuggestions();
   }
+}
+
+function makeCard(cred) {
+  const isMatch = isCredentialMatch(currentDomain, cred.domain);
+  const initials = (cred.domain[0] || '?').toUpperCase();
+  const faviconUrl = getFaviconUrl(cred);
+  const card = document.createElement('div');
+  card.className = 'cred-card' + (isMatch ? ' match' : '');
+  card.innerHTML = `
+    <div class="cred-avatar">
+      <img src="${escHtml(faviconUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">
+      <span class="cred-avatar-fallback">${initials}</span>
+    </div>
+    <div class="cred-info">
+      <div class="cred-domain">${escHtml(cred.domain)}</div>
+    </div>
+    <div class="cred-actions">
+      <button class="btn-icon fill" title="Autofill this page">▶</button>
+      <button class="btn-icon edit" title="Update username/password">✎</button>
+      <button class="btn-icon del"  title="Delete">✕</button>
+    </div>`;
+  const avatarImg = card.querySelector('.cred-avatar img');
+  const avatarFallback = card.querySelector('.cred-avatar-fallback');
+  if (!faviconUrl) {
+    avatarImg?.remove();
+    if (avatarFallback) avatarFallback.style.display = 'flex';
+  } else if (avatarImg && avatarFallback) {
+    avatarImg.addEventListener('error', () => {
+      avatarImg.style.display = 'none';
+      avatarFallback.style.display = 'flex';
+    }, { once: true });
+  }
+  card.querySelector('.fill').addEventListener('click', e => { e.stopPropagation(); autofillPage(cred); });
+  card.querySelector('.edit').addEventListener('click', e => { e.stopPropagation(); startEditingCredential(cred); });
+  card.querySelector('.del').addEventListener('click',  e => { e.stopPropagation(); deleteCredential(cred.id); });
+  card.addEventListener('click', () => autofillPage(cred));
+  return card;
+}
+
+function buildTree(creds) {
+  const root = { children: {}, creds: [] };
+  for (const cred of creds) {
+    const parts = folderPathParts(folderAssignments[cred.id]);
+    if (!parts.length) { root.creds.push(cred); continue; }
+    let node = root;
+    for (const { part, fullPath } of parts) {
+      if (!node.children[part]) node.children[part] = { children: {}, creds: [], fullPath };
+      node = node.children[part];
+    }
+    node.creds.push(cred);
+  }
+  return root;
+}
+
+function countCreds(node) {
+  let n = node.creds.length;
+  for (const child of Object.values(node.children)) n += countCreds(child);
+  return n;
+}
+
+function renderNode(name, node) {
+  const section = document.createElement('div');
+  section.className = 'folder-section';
+  const { fullPath } = node;
+
+  const tog = document.createElement('span');
+  tog.className = 'folder-toggle' + (collapsedFolders.has(fullPath) ? ' collapsed' : '');
+  tog.textContent = '▼';
+
+  const label = document.createElement('span');
+  label.className = 'folder-name';
+  label.textContent = name;
+
+  const count = document.createElement('span');
+  count.className = 'folder-count';
+  count.textContent = `(${countCreds(node)})`;
+
+  const header = document.createElement('div');
+  header.className = 'folder-header';
+  header.append(tog, label, count);
+
+  const cards = document.createElement('div');
+  cards.className = 'folder-cards' + (collapsedFolders.has(fullPath) ? ' hidden' : '');
+
+  header.addEventListener('click', () => {
+    const collapsed = tog.classList.toggle('collapsed');
+    cards.classList.toggle('hidden', collapsed);
+    if (collapsed) collapsedFolders.add(fullPath);
+    else collapsedFolders.delete(fullPath);
+    chrome.storage.local.set({ collapsedFolders: [...collapsedFolders] });
+  });
+
+  for (const childName of Object.keys(node.children).sort(byName)) {
+    cards.appendChild(renderNode(childName, node.children[childName]));
+  }
+  for (const cred of node.creds) cards.appendChild(makeCard(cred));
+  section.appendChild(header);
+  section.appendChild(cards);
+  return section;
 }
 
 // ---- Render credential cards ----
@@ -324,101 +421,8 @@ function renderCredentials() {
   });
 
   list.innerHTML = '';
-
-  function makeCard(cred) {
-    const isMatch = isCredentialMatch(currentDomain, cred.domain);
-    const initials = (cred.domain[0] || '?').toUpperCase();
-    const faviconUrl = getFaviconUrl(cred);
-    const card = document.createElement('div');
-    card.className = 'cred-card' + (isMatch ? ' match' : '');
-    card.innerHTML = `
-      <div class="cred-avatar">
-        <img src="${escHtml(faviconUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">
-        <span class="cred-avatar-fallback">${initials}</span>
-      </div>
-      <div class="cred-info">
-        <div class="cred-domain">${escHtml(cred.domain)}</div>
-      </div>
-      <div class="cred-actions">
-        <button class="btn-icon fill" title="Autofill this page">▶</button>
-        <button class="btn-icon edit" title="Update username/password">✎</button>
-        <button class="btn-icon del"  title="Delete">✕</button>
-      </div>`;
-    const avatarImg = card.querySelector('.cred-avatar img');
-    const avatarFallback = card.querySelector('.cred-avatar-fallback');
-    if (!faviconUrl) {
-      avatarImg?.remove();
-      if (avatarFallback) avatarFallback.style.display = 'flex';
-    } else if (avatarImg && avatarFallback) {
-      avatarImg.addEventListener('error', () => {
-        avatarImg.style.display = 'none';
-        avatarFallback.style.display = 'flex';
-      }, { once: true });
-    }
-    card.querySelector('.fill').addEventListener('click', e => { e.stopPropagation(); autofillPage(cred); });
-    card.querySelector('.edit').addEventListener('click', e => { e.stopPropagation(); startEditingCredential(cred); });
-    card.querySelector('.del').addEventListener('click',  e => { e.stopPropagation(); deleteCredential(cred.id); });
-    card.addEventListener('click', () => autofillPage(cred));
-    return card;
-  }
-
-  function buildTree(creds) {
-    const root = { children: {}, creds: [] };
-    for (const cred of creds) {
-      const path = (folderAssignments[cred.id] || '').trim();
-      if (!path) { root.creds.push(cred); continue; }
-      const parts = path.split('/').map(p => p.trim()).filter(Boolean);
-      let node = root;
-      let cum = '';
-      for (const part of parts) {
-        cum = cum ? `${cum}/${part}` : part;
-        if (!node.children[part]) node.children[part] = { children: {}, creds: [], fullPath: cum };
-        node = node.children[part];
-      }
-      node.creds.push(cred);
-    }
-    return root;
-  }
-
-  function countCreds(node) {
-    let n = node.creds.length;
-    for (const child of Object.values(node.children)) n += countCreds(child);
-    return n;
-  }
-
-  function renderNode(name, node) {
-    const section = document.createElement('div');
-    section.className = 'folder-section';
-    const fullPath = node.fullPath;
-    const isCollapsed = collapsedFolders.has(fullPath);
-    const header = document.createElement('div');
-    header.className = 'folder-header';
-    header.innerHTML = `<span class="folder-toggle${isCollapsed ? ' collapsed' : ''}">▼</span> ${escHtml(name)} <span style="color:var(--border)">(${countCreds(node)})</span>`;
-    const cards = document.createElement('div');
-    cards.className = 'folder-cards' + (isCollapsed ? ' hidden' : '');
-    header.addEventListener('click', () => {
-      const tog = header.querySelector('.folder-toggle');
-      if (collapsedFolders.has(fullPath)) {
-        collapsedFolders.delete(fullPath);
-        tog.classList.remove('collapsed');
-        cards.classList.remove('hidden');
-      } else {
-        collapsedFolders.add(fullPath);
-        tog.classList.add('collapsed');
-        cards.classList.add('hidden');
-      }
-    });
-    const childNames = Object.keys(node.children).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    for (const childName of childNames) cards.appendChild(renderNode(childName, node.children[childName]));
-    for (const cred of node.creds) cards.appendChild(makeCard(cred));
-    section.appendChild(header);
-    section.appendChild(cards);
-    return section;
-  }
-
   const root = buildTree(sorted);
-  const topNames = Object.keys(root.children).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  for (const name of topNames) list.appendChild(renderNode(name, root.children[name]));
+  for (const name of Object.keys(root.children).sort(byName)) list.appendChild(renderNode(name, root.children[name]));
   for (const cred of root.creds) list.appendChild(makeCard(cred));
 }
 
@@ -766,7 +770,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const delRes = await chrome.runtime.sendMessage({ type: 'DELETE_CREDENTIAL', id: editingCredential.id });
       if (delRes?.error) throw new Error(delRes.error);
       await removeLoginUrlOverride(editingCredential.id);
-      await setFolderAssignment(editingCredential.id, '');
+      await removeFolderAssignment(editingCredential.id);
     }
     showToast(editingCredential ? '✓ Credential updated' : '✓ Saved to server', 'ok');
     resetCredentialForm();
@@ -792,7 +796,7 @@ async function deleteCredential(id) {
     const res = await chrome.runtime.sendMessage({ type: 'DELETE_CREDENTIAL', id });
     if (res.error) throw new Error(res.error);
     await removeLoginUrlOverride(id);
-    await setFolderAssignment(id, '');
+    await removeFolderAssignment(id);
     showToast('Deleted', 'ok');
     await loadCredentials();
   } catch (err) {
