@@ -242,7 +242,8 @@
       <h2>Settings tab</h2>
       <h3>Google Account</h3>
       <p>If you are signed out, you will see <code>Sign in with Google</code>. If you are signed in, you will see your profile initial, your name, your email, and a <code>✕</code> sign-out button.</p>
-      <p>If Brave shows a <code>400 invalid_request</code> Google sign-in error, open <code>brave://settings/extensions</code>, enable <code>Allow Google login for extensions</code>, sign into Google in a normal Brave tab, reload SenKey, and try signing in again.</p>
+      <p>In Brave, enable <code>brave://settings/extensions</code> &gt; <code>Allow Google login for extensions</code>, then sign into Google in a normal Brave tab before signing into SenKey.</p>
+      <p>If you are testing an unpacked custom build, run <code>./build.sh</code> and load <code>dist/</code>. The OAuth client IDs in <code>.env</code> must match that installed extension ID.</p>
 
       <h3>Server Configuration</h3>
       <p>Enter <code>API URL</code> and <code>API Key</code>, then click <code>Save Settings</code>.</p>
@@ -254,6 +255,10 @@
         <strong>Keep exported keys safe.</strong>
         SenKey uses these keys to decrypt your saved passwords. If they are lost and your browser storage is gone, you may not be able to recover your saved passwords. Anyone with this key file may be able to read the passwords protected by it.
       </div>
+
+      <h3>Bookmarks</h3>
+      <p>Use <code>Export Bookmarks</code> to download a JSON backup of all browser bookmarks.</p>
+      <p>Use <code>Import Bookmarks</code> to restore a bookmark JSON backup into a new folder on the bookmarks bar. Existing bookmarks are not deleted or overwritten.</p>
     </section>
 
     <section class="section">
@@ -271,6 +276,8 @@
           <code>Deleted</code><br>
           <code>Signed out</code><br>
           <code>Keys exported</code><br>
+          <code>Bookmarks exported</code><br>
+          <code>✓ Bookmarks imported</code><br>
           <code>Updated saved login URL</code>
         </div>
       </div>

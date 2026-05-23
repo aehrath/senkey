@@ -75,24 +75,22 @@ When deploy finishes, copy the printed values into SenKey:
 - You do not need to add `GCS_BUCKET` to `.env`.
 - If you use the published SenKey extension unchanged, you do not need your own
   Google OAuth client. The published extension already has one.
-- `GOOGLE_OAUTH_CLIENT_ID` and `DEV_GOOGLE_OAUTH_CLIENT_ID` are used only when
-  building your own extension. They are not used by the backend API.
+- OAuth client IDs are used only when building your own extension. They are not
+  used by the backend API.
 
 ## Troubleshooting
 
-- `400 invalid_request` during Google sign-in
-  This comes from extension Google sign-in, not from Cloud Run. Steps to resolve:
-  - In Brave, open `brave://settings/extensions`, enable `Allow Google login for extensions`.
-  - Sign into Google in a normal Brave tab, reload SenKey, then try again.
-    (The extension login setting has no effect when the browser is not logged into Google.)
-  - If you use the published SenKey extension unchanged, reinstall or reload it and configure only `API URL` and `API Key`.
-  - If you build your own extension, create a Google OAuth client with type `Chrome extension` / `Chrome App`.
-    Make its Chrome App / Item ID match the installed extension ID, then put the generated client ID in `.env`
-    as `GOOGLE_OAUTH_CLIENT_ID` for production builds or `DEV_GOOGLE_OAUTH_CLIENT_ID` for dev builds.
-    Run `./build.sh` and reload the extension.
+- Google sign-in fails
+  This comes from extension Google sign-in, not from Cloud Run. If you use the
+  published extension unchanged, configure only `API URL` and `API Key`. In
+  Brave, enable `brave://settings/extensions` > `Allow Google login for
+  extensions`, then sign into Google in a normal Brave tab. For custom extension
+  builds, confirm the OAuth clients in `.env` match the installed extension ID,
+  run `./build.sh`, and reload `dist/`.
 - `Unauthorized`
   Check that the extension `API Key` matches the deployed `API_KEY`.
 - `Google sign-in required`
-  Check that the extension has the correct OAuth client ID and the user is signed in.
+  Check that the user is signed in through the extension. For custom extension
+  builds, also check the OAuth setup in the repo README.
 - `GCS_BUCKET env var not set`
   Redeploy and confirm the latest Cloud Run revision is active.

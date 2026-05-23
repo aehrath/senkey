@@ -130,7 +130,7 @@ Click the `👁` button next to the password field.
 
 ## Settings tab
 
-Use the `⚙` tab to manage sign-in, server settings, and encryption keys.
+Use the `⚙` tab to manage sign-in, server settings, encryption keys, and bookmark backups.
 
 ### Google Account
 
@@ -152,11 +152,12 @@ If you are signed in, you will see:
 
 If sign-in succeeds, SenKey shows `✓ Signed in as ...`
 
-If Brave shows a `400 invalid_request` Google sign-in error, open
-`brave://settings/extensions`, enable `Allow Google login for extensions`, then
-sign into Google in a normal Brave tab, reload SenKey, and try signing in again.
-Brave says the extension login setting has no effect when the browser is not
-logged into Google.
+Brave users should also enable `brave://settings/extensions` > `Allow Google
+login for extensions`, then sign into Google in a normal Brave tab before
+signing into SenKey.
+
+If you are testing an unpacked custom build, run `./build.sh` and load `dist/`.
+The OAuth client IDs in `.env` must match that installed extension ID.
 
 #### Sign out
 
@@ -213,6 +214,27 @@ Anyone with this file may be able to read the passwords protected by it.
 
 If import succeeds, SenKey shows `✓ Keys imported`.
 
+### Bookmarks
+
+Visible controls:
+
+- `Export Bookmarks`
+- `Import Bookmarks`
+
+#### Export bookmarks
+
+Click `Export Bookmarks` to download a JSON backup of the browser bookmark tree.
+
+#### Import bookmarks
+
+1. Click `Import Bookmarks`.
+2. Choose a previously exported bookmark JSON file.
+
+SenKey imports bookmarks into a new folder on the bookmarks bar. Existing
+bookmarks are not deleted or overwritten.
+
+If import succeeds, SenKey shows `✓ Bookmarks imported`.
+
 ## Help button
 
 Click `Help` in the popup header to reopen the built-in SenKey help page at any time.
@@ -229,6 +251,8 @@ Common success messages:
 - `✓ Settings saved`
 - `✓ Keys imported`
 - `Keys exported`
+- `Bookmarks exported`
+- `✓ Bookmarks imported`
 - `Deleted`
 - `Signed out`
 - `Opening and filling ...`

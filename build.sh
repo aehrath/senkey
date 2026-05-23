@@ -7,7 +7,8 @@
 #
 # Setup:
 #   cp .env.example .env
-#   # fill in GOOGLE_OAUTH_CLIENT_ID, DEV_GOOGLE_OAUTH_CLIENT_ID, API_KEY etc. in .env
+#   # fill in GOOGLE_OAUTH_CLIENT_ID, DEV_GOOGLE_OAUTH_CLIENT_ID,
+#   # WEB_GOOGLE_OAUTH_CLIENT_ID, API_KEY etc. in .env
 
 set -e
 
@@ -45,7 +46,7 @@ fi
 rm -rf dist
 mkdir -p dist
 
-cp extension/popup.html extension/popup.js extension/background.js extension/content.js extension/manual.html dist/
+cp extension/popup.html extension/popup.js extension/background.js extension/content.js extension/manual.html extension/oauth_config.js dist/
 cp -r extension/icons dist/
 
 if [ -z "${EXTENSION_KEY:-}" ]; then
@@ -68,7 +69,7 @@ if [ "$BUILD_MODE" != "prod" ] && [ -z "${EXTENSION_KEY:-}" ]; then
   exit 1
 fi
 
-export GOOGLE_OAUTH_CLIENT_ID EXTENSION_KEY CHROME_EXTENSION_ID
+export GOOGLE_OAUTH_CLIENT_ID WEB_GOOGLE_OAUTH_CLIENT_ID EXTENSION_KEY CHROME_EXTENSION_ID
 export BUILD_MODE
 
 python3 - <<'PYEOF'
@@ -82,6 +83,7 @@ with open("extension/manifest.json") as f:
     m = json.load(f)
 
 m["oauth2"]["client_id"] = os.environ["GOOGLE_OAUTH_CLIENT_ID"]
+web_oauth_client_id = os.environ.get("WEB_GOOGLE_OAUTH_CLIENT_ID", "")
 
 key = os.environ.get("EXTENSION_KEY", "")
 expected_extension_id = os.environ["CHROME_EXTENSION_ID"]
@@ -116,12 +118,19 @@ with open("dist/manifest.json", "w") as f:
     json.dump(m, f, indent=2)
 
 # Keep the source manifest in sync too, so loading extension/ directly
-# after a build doesn't leave Chrome pointing at the placeholder client ID.
+# after a dev build preserves the extension ID registered with Google OAuth.
 source_manifest = dict(m)
-source_manifest.pop("key", None)
+if build_mode == "prod":
+    source_manifest.pop("key", None)
 with open("extension/manifest.json", "w") as f:
     json.dump(source_manifest, f, indent=2)
     f.write("\n")
+
+oauth_config = f"self.SENKEY_WEB_GOOGLE_OAUTH_CLIENT_ID = {json.dumps(web_oauth_client_id)};\n"
+with open("dist/oauth_config.js", "w") as f:
+    f.write(oauth_config)
+with open("extension/oauth_config.js", "w") as f:
+    f.write(oauth_config)
 PYEOF
 
 if [ "${1}" = "prod" ]; then

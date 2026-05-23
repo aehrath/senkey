@@ -100,6 +100,13 @@ function showToast(msg, type = 'ok') {
   setTimeout(() => t.className = 'toast', 2500);
 }
 
+function showAuthError(message = '') {
+  const el = document.getElementById('authError');
+  if (!el) return;
+  el.textContent = message;
+  el.style.display = message ? 'block' : 'none';
+}
+
 // ---- Load current domain ----
 async function getCurrentDomain() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -808,6 +815,7 @@ async function deleteCredential(id) {
 async function loadAuthState() {
   const { googleUser } = await chrome.storage.local.get('googleUser');
   if (googleUser) {
+    showAuthError();
     document.getElementById('signedOut').style.display = 'none';
     document.getElementById('signedIn').style.display  = 'block';
     document.getElementById('userName').textContent    = googleUser.name  || '';
@@ -823,6 +831,7 @@ document.getElementById('signInBtn').addEventListener('click', async () => {
   const btn = document.getElementById('signInBtn');
   btn.disabled = true;
   btn.querySelector('svg').nextSibling.textContent = ' Signing in…';
+  showAuthError();
   try {
     const res = await chrome.runtime.sendMessage({ type: 'GOOGLE_SIGN_IN' });
     if (res.error) throw new Error(res.error);
@@ -830,7 +839,9 @@ document.getElementById('signInBtn').addEventListener('click', async () => {
     await loadAuthState();
     await loadCredentials();
   } catch (err) {
-    showToast(err.message, 'err');
+    const message = err.message || 'Google sign-in failed';
+    showAuthError(message);
+    showToast('Google sign-in failed', 'err');
   } finally {
     btn.disabled = false;
     btn.querySelector('svg').nextSibling.textContent = ' Sign in with Google';
@@ -878,6 +889,95 @@ document.getElementById('importKeyFile').addEventListener('change', async e => {
     await loadCredentials();
   } catch (err) {
     showToast(err.message || 'Invalid key file', 'err');
+  }
+  e.target.value = '';
+});
+
+// ---- Bookmark export / import ----
+const bookmarksApi = chrome.bookmarks;
+
+function bookmarkCall(fn, ...args) {
+  return new Promise((resolve, reject) => {
+    fn(...args, result => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(result);
+    });
+  });
+}
+
+async function getBookmarkImportParentId() {
+  const tree = await bookmarkCall(bookmarksApi.getTree.bind(bookmarksApi));
+  const rootChildren = tree?.[0]?.children || [];
+  const bookmarksBar = rootChildren.find(node => /bookmarks bar/i.test(node.title || ''));
+  return (bookmarksBar || rootChildren[0])?.id;
+}
+
+function normalizeBookmarkRoots(data) {
+  if (data?.senkeyBookmarks && Array.isArray(data.roots)) return data.roots;
+  if (Array.isArray(data) && data[0]?.children) return data[0].children;
+  if (data && typeof data === 'object') {
+    const sample = Object.values(data).find(value => value && typeof value === 'object');
+    if (sample?.domain || sample?.username || sample?.password || sample?.loginUrl) {
+      throw new Error('That is a credentials file, not a bookmarks backup');
+    }
+  }
+  throw new Error('Invalid bookmarks file');
+}
+
+async function importBookmarkNode(node, parentId) {
+  if (!node || !parentId) return;
+  const title = (node.title || 'Untitled').trim() || 'Untitled';
+  if (node.url) {
+    await bookmarkCall(bookmarksApi.create.bind(bookmarksApi), { parentId, title, url: node.url });
+    return;
+  }
+
+  const folder = await bookmarkCall(bookmarksApi.create.bind(bookmarksApi), { parentId, title });
+  for (const child of node.children || []) {
+    await importBookmarkNode(child, folder.id);
+  }
+}
+
+document.getElementById('exportBookmarksBtn').addEventListener('click', async () => {
+  try {
+    const roots = await bookmarkCall(bookmarksApi.getTree.bind(bookmarksApi));
+    const data = {
+      senkeyBookmarks: true,
+      exportedAt: new Date().toISOString(),
+      roots: roots?.[0]?.children || roots,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `senkey-bookmarks-${stamp}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Bookmarks exported', 'ok');
+  } catch (err) {
+    showToast(err.message || 'Could not export bookmarks', 'err');
+  }
+});
+
+document.getElementById('importBookmarksFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const roots = normalizeBookmarkRoots(JSON.parse(await file.text()));
+    const parentId = await getBookmarkImportParentId();
+    if (!parentId) throw new Error('Could not find bookmarks bar');
+
+    const importedFolder = await bookmarkCall(bookmarksApi.create.bind(bookmarksApi), {
+      parentId,
+      title: `SenKey Import ${new Date().toLocaleString()}`,
+    });
+    for (const root of roots) {
+      await importBookmarkNode(root, importedFolder.id);
+    }
+    showToast('✓ Bookmarks imported', 'ok');
+  } catch (err) {
+    showToast(err.message || 'Invalid bookmarks file', 'err');
   }
   e.target.value = '';
 });

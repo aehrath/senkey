@@ -17,6 +17,7 @@ It is built around four ideas:
 - Stores a login URL so a credential can reopen the correct sign-in page later
 - Can navigate to a saved login page and autofill after the page loads
 - Keeps data separated by signed-in Google user
+- Exports and imports browser bookmarks from Settings
 
 ## Project layout
 
@@ -134,78 +135,66 @@ Basic setup:
 
 ## Google OAuth Setup
 
-SenKey uses `chrome.identity`, so it needs a Google OAuth client created for a Chrome extension.
+Published SenKey users do not need to create Google OAuth clients. The published
+extension already includes the correct client ID. Deploy a backend, then paste
+the backend `API URL` and `API Key` into SenKey settings.
 
-If you use the published SenKey extension without modifying or rebuilding it,
-you do not need to create your own Google OAuth client. The published extension
-already contains the correct OAuth client ID. You only need to deploy your
-backend and paste the backend `API URL` and `API Key` into the extension.
+Create OAuth clients only when you build, fork, or load your own copy of the
+extension.
 
-Create your own OAuth client only if you build, fork, or load your own copy of
-the extension. For production builds, copy the generated client ID into `.env`
-as `GOOGLE_OAUTH_CLIENT_ID`. For local dev builds, run `./build.sh` once to get
-the stable dev extension ID — it is printed by `./build.sh` on the
-`🔐  Dev extension ID:` line. Create a Chrome
-Extension OAuth client for that ID, then copy the generated client ID into `.env`
-as `DEV_GOOGLE_OAUTH_CLIENT_ID`.
+### Custom Chrome or Edge Build
 
-Google Cloud Console flow:
-
-1. Open [Google Cloud Console](https://console.cloud.google.com).
-2. Select your project.
-3. Open `Google Auth Platform` or `APIs & Services`.
-4. Open `Credentials`.
-5. Click `Create Credentials`.
-6. Create an OAuth client for a Chrome extension / Chrome App.
-7. When asked for the Chrome App / Item ID, enter the extension ID:
+1. Run `./build.sh` once and note the `Dev extension ID` it prints.
+2. In Google Cloud Console, create an OAuth client with application type
+   `Chrome extension` / `Chrome App`.
+3. Use the installed extension ID as the Chrome App / Item ID.
+4. Put the generated client ID in `.env`:
 
 ```text
-gcmgfpkabdjhniklindbjieohnfngchg
+DEV_GOOGLE_OAUTH_CLIENT_ID=...
 ```
 
-For a dev build, run `./build.sh` and use the Extension ID printed on the `🔐  Dev extension ID:` line.
+For production Web Store builds, use `GOOGLE_OAUTH_CLIENT_ID` instead.
 
-8. Finish creation and copy the generated OAuth client ID.
-9. Put that value into `.env` as `GOOGLE_OAUTH_CLIENT_ID` for production builds,
-   or `DEV_GOOGLE_OAUTH_CLIENT_ID` for local dev builds.
-10. Run `./build.sh` so the manifest gets the current client ID automatically.
+### Brave Fallback Client
 
-The extension ID is also stored in `.env` as `CHROME_EXTENSION_ID`.
+Brave may reject the normal Chrome Extension OAuth flow. SenKey falls back to a
+web auth flow in Brave, which requires a second OAuth client.
 
-### Google Sign-In Error: `400 invalid_request`
-
-This error is usually an extension OAuth setup problem, not a Cloud Run
-backend problem.
-
-Check these items:
-
-- In Brave, open `brave://settings/extensions`, enable `Allow Google login for
-  extensions`, then try signing in from SenKey again.
-- In Brave, also sign into Google in a normal browser tab, then reload SenKey.
-  Brave says the extension login setting has no effect when the browser is not
-  logged into Google.
-- If you are using the published SenKey extension unchanged, do not rebuild it
-  with another OAuth client. Reinstall or reload the published build, then paste
-  only your backend `API URL` and `API Key` in Settings.
-- The OAuth client in Google Cloud must be type `Chrome extension` / `Chrome
-  App`, not `Web application` or `Desktop app`. This applies only to custom
-  extension builds.
-- The Chrome App / Item ID on that OAuth client must exactly match the
-  installed extension ID.
-- For the published SenKey extension, use:
+1. In Google Cloud Console, create an OAuth client with application type
+   `Web application`.
+2. Add this authorized redirect URI, replacing the ID with your installed
+   extension ID:
 
 ```text
-gcmgfpkabdjhniklindbjieohnfngchg
+https://<extension-id>.chromiumapp.org/oauth2
 ```
 
-- If you are loading an unpacked development build, run `./build.sh` and use
-  the Extension ID printed on the `🔐  Dev extension ID:` line when creating
-  `DEV_GOOGLE_OAUTH_CLIENT_ID`.
-- After changing `GOOGLE_OAUTH_CLIENT_ID` or `DEV_GOOGLE_OAUTH_CLIENT_ID`, run
-  `./build.sh`, reload the extension, and sign in again.
+3. Put that Web client ID in `.env`:
 
-The downloaded `client_secret_*.json` file from Google Cloud is not used by
-this Chrome extension. Only the generated OAuth client ID belongs in `.env`.
+```text
+WEB_GOOGLE_OAUTH_CLIENT_ID=...
+```
+
+4. Run `./build.sh` and reload the built `dist/` extension.
+
+### OAuth Troubleshooting
+
+- If you use the published extension unchanged, configure only `API URL` and
+  `API Key`. Do not rebuild it with your own OAuth client.
+- For unpacked builds, load `dist/` after running `./build.sh`.
+- The Chrome Extension OAuth client must be application type `Chrome extension`
+  / `Chrome App`; its Item ID must exactly match the installed extension ID.
+- The Brave fallback OAuth client must be application type `Web application`;
+  its authorized redirect URI must be
+  `https://<extension-id>.chromiumapp.org/oauth2`.
+- In Brave, enable `brave://settings/extensions` > `Allow Google login for
+  extensions`, and sign into Google in a normal Brave tab.
+- After changing `GOOGLE_OAUTH_CLIENT_ID`, `DEV_GOOGLE_OAUTH_CLIENT_ID`, or
+  `WEB_GOOGLE_OAUTH_CLIENT_ID`, run `./build.sh` and reload the extension.
+
+Google's downloaded `client_secret_*.json` file is not used by this extension.
+Only the generated OAuth client IDs belong in `.env`.
 
 ## Build Commands
 
@@ -256,6 +245,10 @@ Daily use:
 - `Help`
   Open the built-in help page.
 
+Settings also includes bookmark backup controls. `Export Bookmarks` downloads a
+JSON file containing the browser bookmark tree. `Import Bookmarks` adds a JSON
+backup into a new folder on the bookmarks bar.
+
 The full user-facing guide is in `USER-MANUAL.md`, and the installed extension also includes its own help page at `extension/manual.html`.
 
 ## Login URL Behavior
@@ -277,6 +270,8 @@ SenKey updates login URLs only when it believes the current page is a real login
 - Google sign-in separates one user's data from another user's data.
 - The API key acts as a shared server-level gate.
 - Exported SenKey keys are sensitive and should be stored privately.
+- Bookmark exports are local JSON files created only when the user requests
+  them. Imported bookmarks are added to a new bookmarks bar folder.
 
 ## Browser Support
 

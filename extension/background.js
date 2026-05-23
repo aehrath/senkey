@@ -1,5 +1,11 @@
 // background.js – service worker for SenKey extension
 
+try {
+  importScripts('oauth_config.js');
+} catch {
+  self.SENKEY_WEB_GOOGLE_OAUTH_CLIENT_ID = '';
+}
+
 const pendingAutofills = new Map();
 
 chrome.runtime.onInstalled.addListener(details => {
@@ -29,6 +35,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'GOOGLE_SIGN_IN') {
     googleSignIn().then(sendResponse).catch(err => sendResponse({ error: err.message }));
+    return true;
+  }
+  if (msg.type === 'GOOGLE_AUTH_DIAGNOSTICS') {
+    sendResponse(getGoogleAuthDiagnostics());
     return true;
   }
   if (msg.type === 'GOOGLE_SIGN_OUT') {
@@ -130,11 +140,162 @@ async function getConfig() {
 }
 
 async function getGoogleToken() {
-  return new Promise(resolve => {
+  const { googleAccessToken, googleAccessTokenExpiresAt } =
+    await chrome.storage.local.get(['googleAccessToken', 'googleAccessTokenExpiresAt']);
+  if (googleAccessToken && googleAccessTokenExpiresAt && Date.now() < googleAccessTokenExpiresAt - 60000) {
+    return googleAccessToken;
+  }
+
+  const token = await new Promise(resolve => {
     chrome.identity.getAuthToken({ interactive: false }, token => {
       resolve(chrome.runtime.lastError ? null : token);
     });
   });
+  if (token) return token;
+
+  await chrome.storage.local.remove(['googleAccessToken', 'googleAccessTokenExpiresAt']);
+  return null;
+}
+
+function getGoogleAuthErrorMessage(message) {
+  const diagnostics = getGoogleAuthDiagnostics();
+  return [
+    message || 'Google sign-in failed.',
+    `Extension ID: ${diagnostics.extensionId}`,
+    `OAuth client: ${diagnostics.oauthClientId}`,
+    `Redirect URI: ${diagnostics.redirectUri}`,
+    `Web OAuth client: ${diagnostics.webOAuthClientId}`,
+    'In Brave, open brave://settings/extensions, enable "Allow Google login for extensions", sign into Google in a normal Brave tab, reload SenKey, and try again.',
+    'For Brave fallback, create a Google OAuth Web application client and set WEB_GOOGLE_OAUTH_CLIENT_ID in .env.',
+    'For unpacked builds, load the dist/ folder created by ./build.sh so the extension ID matches the Google OAuth client.',
+  ].filter(Boolean).join(' | ');
+}
+
+function getGoogleAuthDiagnostics() {
+  const manifest = chrome.runtime.getManifest();
+  const webOAuthClientId = self.SENKEY_WEB_GOOGLE_OAUTH_CLIENT_ID || '';
+  return {
+    extensionId: chrome.runtime.id,
+    oauthClientId: manifest.oauth2?.client_id || 'missing',
+    webOAuthClientId: webOAuthClientId || 'not configured',
+    redirectUri: chrome.identity.getRedirectURL('oauth2'),
+    webAuthFlow: 'enabled',
+    extensionName: manifest.name,
+    version: manifest.version,
+  };
+}
+
+function randomState() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isGoogleAuthUrl(value) {
+  try {
+    const url = new URL(value || '');
+    return url.hostname === 'accounts.google.com' &&
+      (/\/o\/oauth2\//.test(url.pathname) || /\/signin\/oauth/.test(url.pathname));
+  } catch {
+    return false;
+  }
+}
+
+async function getGoogleAuthTabIds() {
+  return new Promise(resolve => {
+    chrome.tabs.query({ url: 'https://accounts.google.com/*' }, tabs => {
+      if (chrome.runtime.lastError) {
+        resolve(new Set());
+        return;
+      }
+      resolve(new Set((tabs || []).filter(tab => isGoogleAuthUrl(tab.url)).map(tab => tab.id)));
+    });
+  });
+}
+
+async function closeNewGoogleAuthTabs(previousTabIds) {
+  return new Promise(resolve => {
+    chrome.tabs.query({ url: 'https://accounts.google.com/*' }, tabs => {
+      if (chrome.runtime.lastError) {
+        resolve();
+        return;
+      }
+      const tabIds = (tabs || [])
+        .filter(tab => tab.id && !previousTabIds.has(tab.id) && isGoogleAuthUrl(tab.url))
+        .map(tab => tab.id);
+      if (!tabIds.length) {
+        resolve();
+        return;
+      }
+      chrome.tabs.remove(tabIds, () => resolve());
+    });
+  });
+}
+
+async function getTokenWithChromeIdentity(interactive) {
+  const existingGoogleAuthTabIds = interactive ? await getGoogleAuthTabIds() : new Set();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      void closeNewGoogleAuthTabs(existingGoogleAuthTabIds);
+      reject(new Error('Chrome identity sign-in did not finish.'));
+    }, interactive ? 2000 : 1000);
+
+    chrome.identity.getAuthToken({ interactive }, token => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(token);
+    });
+  });
+}
+
+async function getTokenWithWebAuthFlow() {
+  const manifest = chrome.runtime.getManifest();
+  const webOAuthClientId = self.SENKEY_WEB_GOOGLE_OAUTH_CLIENT_ID || '';
+  if (!webOAuthClientId) {
+    throw new Error('Brave web auth fallback is missing WEB_GOOGLE_OAUTH_CLIENT_ID.');
+  }
+
+  const redirectUri = chrome.identity.getRedirectURL('oauth2');
+  const state = randomState();
+  const authParams = new URLSearchParams({
+    client_id: webOAuthClientId,
+    response_type: 'token',
+    redirect_uri: redirectUri,
+    scope: (manifest.oauth2?.scopes || []).join(' '),
+    state,
+    prompt: 'select_account',
+  });
+
+  const finalUrl = await chrome.identity.launchWebAuthFlow({
+    url: `https://accounts.google.com/o/oauth2/v2/auth?${authParams.toString()}`,
+    interactive: true,
+  });
+  if (!finalUrl) throw new Error('Google sign-in was cancelled.');
+
+  const parsed = new URL(finalUrl);
+  const params = new URLSearchParams(parsed.hash ? parsed.hash.slice(1) : parsed.search.slice(1));
+  if (params.get('state') !== state) throw new Error('Google sign-in state mismatch.');
+  if (params.get('error')) {
+    throw new Error(params.get('error_description') || params.get('error') || 'Google sign-in failed.');
+  }
+
+  const token = params.get('access_token');
+  if (!token) throw new Error('Google did not return an access token.');
+  const expiresIn = Number(params.get('expires_in') || 3600);
+  await chrome.storage.local.set({
+    googleAccessToken: token,
+    googleAccessTokenExpiresAt: Date.now() + Math.max(60, expiresIn) * 1000,
+  });
+  return token;
 }
 
 async function makeHeaders(includeContentType = false) {
@@ -192,34 +353,26 @@ async function handleDelete(id) {
 }
 
 async function googleSignIn() {
-  return new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken({ interactive: true }, async token => {
-      if (chrome.runtime.lastError) {
-        const manifest = chrome.runtime.getManifest();
-        const details = [
-          chrome.runtime.lastError.message,
-          `Extension ID: ${chrome.runtime.id}`,
-          `OAuth client: ${manifest.oauth2?.client_id || 'missing'}`,
-          'In Brave, sign into Google in a normal tab, enable brave://settings/extensions > Allow Google login for extensions, then reload SenKey.',
-        ].filter(Boolean).join(' | ');
-        reject(new Error(details));
-        return;
-      }
-      try {
-        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch user info from Google');
-        const info = await res.json();
-        await chrome.storage.local.set({
-          googleUser: { email: info.email, name: info.name, picture: info.picture },
-        });
-        resolve({ email: info.email, name: info.name });
-      } catch (err) {
-        reject(err);
-      }
+  let token;
+  let identityError = null;
+  try {
+    token = await getTokenWithChromeIdentity(true);
+  } catch (err) {
+    identityError = err;
+    token = await getTokenWithWebAuthFlow().catch(webErr => {
+      throw new Error(getGoogleAuthErrorMessage(`${identityError.message} | Web auth flow: ${webErr.message}`));
     });
+  }
+
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { 'Authorization': `Bearer ${token}` },
   });
+  if (!res.ok) throw new Error('Failed to fetch user info from Google');
+  const info = await res.json();
+  await chrome.storage.local.set({
+    googleUser: { email: info.email, name: info.name, picture: info.picture },
+  });
+  return { email: info.email, name: info.name };
 }
 
 async function googleSignOut() {
@@ -228,7 +381,7 @@ async function googleSignOut() {
     await new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
   }
   await new Promise(resolve => chrome.identity.clearAllCachedAuthTokens(resolve));
-  await chrome.storage.local.remove('googleUser');
+  await chrome.storage.local.remove(['googleUser', 'googleAccessToken', 'googleAccessTokenExpiresAt']);
   return { success: true };
 }
 

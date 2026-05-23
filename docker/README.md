@@ -120,28 +120,16 @@ Use those values in the extension:
 
 ## Google OAuth note
 
+OAuth client IDs are used by the browser extension build, not by this backend.
+
 If you use the published SenKey extension unchanged, you do not need to create
-your own Google OAuth client. The published extension already has the correct
-OAuth client ID.
+your own Google OAuth client. Create OAuth clients only when you build, fork, or
+load your own copy of the extension.
 
-Create an OAuth client only if you build, fork, or load your own copy of the
-extension. For a custom build, create a Chrome Extension OAuth client in Google
-Cloud and use:
-
-```text
-gcmgfpkabdjhniklindbjieohnfngchg
-```
-
-as the Chrome App / Item ID if you want to keep the published extension ID.
-
-After Google creates the OAuth client, put the resulting client ID in `.env` as:
-
-```text
-GOOGLE_OAUTH_CLIENT_ID=...
-```
-
-For local dev builds, use `DEV_GOOGLE_OAUTH_CLIENT_ID` instead. OAuth client
-IDs are used by the extension build process, not by the backend API.
+For custom extension builds, see the Google OAuth setup in
+[../README.md](../README.md). Chrome and Edge use a `Chrome extension` OAuth
+client. Brave may also need a separate `Web application` OAuth client for the
+fallback sign-in flow.
 
 ## Runtime variables
 
@@ -176,17 +164,16 @@ md5(domain + "|" + username)
 
 ## Troubleshooting
 
-### `400 invalid_request` during Google sign-in
+### Google sign-in fails
 
-This comes from extension Google sign-in, not from Cloud Run. In Brave, open
-`brave://settings/extensions`, enable `Allow Google login for extensions`, then
-sign into Google in a normal Brave tab, reload SenKey, and try signing in again.
-Brave says the extension login setting has no effect when the browser is not
-logged into Google.
+This comes from extension Google sign-in, not from Cloud Run.
 
-For custom extension builds, also confirm the Google OAuth client is type
-`Chrome extension` / `Chrome App` and its Chrome App / Item ID matches the
-installed extension ID.
+- If you use the published extension unchanged, reinstall or reload it and
+  configure only `API URL` and `API Key`.
+- In Brave, enable `brave://settings/extensions` > `Allow Google login for
+  extensions`, then sign into Google in a normal Brave tab.
+- For custom extension builds, confirm the OAuth clients in `.env` match the
+  installed extension ID, run `./build.sh`, and reload `dist/`.
 
 ### `Unauthorized`
 
@@ -200,7 +187,7 @@ Check that:
 Check that:
 
 - the user is signed in through the extension
-- custom extension builds have the correct OAuth client ID
+- custom extension builds follow the OAuth setup in the repo README
 - Google sign-in is working in the extension
 
 ### `GCS_BUCKET env var not set`

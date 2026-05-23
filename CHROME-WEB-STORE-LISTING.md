@@ -23,6 +23,7 @@ SenKey is built for people and teams who want:
 - client-side password encryption before upload
 - saved login URLs for reopening the correct sign-in page later
 - folder organization for grouping credentials
+- bookmark backup and restore from the Settings tab
 - a lightweight, focused password fill workflow
 
 How SenKey works:
@@ -61,6 +62,10 @@ Key features:
 
 - Built-in help
   The extension includes a built-in help page for setup and daily use.
+
+- Bookmark export and import
+  Export all browser bookmarks to a JSON backup and import them later into a
+  new bookmarks bar folder.
 
 Who SenKey is for:
 
@@ -123,6 +128,12 @@ Used to interact with the currently open page when the user asks SenKey to autof
 
 Used to inject autofill logic into the current page after the user selects a saved credential.
 
+### `bookmarks`
+
+Used only when the user clicks `Export Bookmarks` or `Import Bookmarks` in
+Settings. Exports create a local JSON file. Imports add bookmarks into a new
+folder on the bookmarks bar.
+
 ### Host permissions: `https://*/*` and `http://*/*`
 
 Used only so SenKey can fill login forms on sites the user chooses to use with the extension.
@@ -137,11 +148,14 @@ What SenKey handles:
 - backend API URL and API key entered by the user
 - encrypted credential records stored on the user's chosen backend
 - local encryption keys stored in the browser profile
+- bookmark data exported or imported only when the user explicitly clicks the
+  bookmark backup controls
 
 What SenKey does not do:
 
 - SenKey does not run a shared hosted credential storage service
 - SenKey does not require sending plaintext passwords to a SenKey-operated cloud service
+- SenKey does not send bookmark backups to any SenKey-operated service
 
 ## Support URL suggestion
 
@@ -170,8 +184,9 @@ Your backend. Your credentials. Fast login autofill in Chrome.
 1. Fill tab showing saved credentials grouped by folder
 2. Add tab with `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder` fields
 3. Settings tab with Google sign-in and server configuration
-4. Built-in Help page
-5. A before-and-after autofill example on a login page
+4. Bookmark and encryption backup controls in Settings
+5. Built-in Help page
+6. A before-and-after autofill example on a login page
 
 ## Submission notes
 

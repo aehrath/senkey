@@ -16,9 +16,9 @@
     --accent:    #7c6af7;
     --accent2:   #56cfb2;
     --danger:    #e05c5c;
-    --text:      #e8e8f0;
-    --text2:     #b0b0c4;
-    --muted:     #6e6e85;
+    --text:      #f2f2f7;
+    --text2:     #c9c9d8;
+    --muted:     #9a9aad;
     --success:   #56cfb2;
     --radius:    8px;
     --radius-sm: 5px;
@@ -58,12 +58,11 @@
     color: var(--text);
   }
   .logo-icon {
-    width: 28px; height: 28px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    width: 32px; height: 32px;
     border-radius: var(--radius-sm);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
+    display: block;
     flex-shrink: 0;
+    object-fit: cover;
   }
   .version-badge {
     font-size: 10px;
@@ -373,7 +372,17 @@
     font-size: 10px;
     color: var(--text2);
   }
-
+  .auth-error {
+    display: none;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 11px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
   .divider { height: 1px; background: var(--border); margin: 16px 0; }
 
   .key-actions { display: flex; gap: 8px; }
@@ -433,7 +442,7 @@
 
 <div class="header">
   <div class="logo">
-    <div class="logo-icon">🔑</div>
+    <img class="logo-icon" src="icons/icon48.png" alt="">
     SenKey
     <span id="versionBadge" class="version-badge"></span>
   </div>
@@ -504,6 +513,7 @@
       Sign in with Google
     </button>
     <div class="note" style="margin-top:6px">Required to access your credentials on the server.</div>
+    <div class="auth-error" id="authError"></div>
   </div>
   <div id="signedIn" style="display:none">
     <div class="user-card">
@@ -543,6 +553,15 @@
     <input type="file" id="importKeyFile" accept=".json" style="display:none">
   </div>
   <div class="note" style="margin-top:8px">Back up your keys or copy them to another device. Keep the export file private — it contains your private key.</div>
+
+  <div class="divider"></div>
+  <div class="section-title">Bookmarks</div>
+  <div class="key-actions">
+    <button class="btn btn-secondary" id="exportBookmarksBtn">Export Bookmarks</button>
+    <label class="btn btn-secondary" for="importBookmarksFile">Import Bookmarks</label>
+    <input type="file" id="importBookmarksFile" accept=".json,application/json" style="display:none">
+  </div>
+  <div class="note" style="margin-top:8px">Export a JSON backup of all browser bookmarks. Imports are added to a new folder on the bookmarks bar.</div>
 
   <div class="divider"></div>
   <div class="section-title">Quick fill on this page</div>

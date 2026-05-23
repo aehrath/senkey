@@ -7,7 +7,8 @@
     "activeTab",
     "scripting",
     "storage",
-    "identity"
+    "identity",
+    "bookmarks"
   ],
   "oauth2": {
     "client_id": "456135155814-qgt4cb89sv1vsgtl4jtljev698tbhdjp.apps.googleusercontent.com",
@@ -36,5 +37,6 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxxVUU9i1dDkNTdV1RNrGl0Qk8rWrR53ZQ7tB1k1gKdLZW0NQpZMcjeycTK1b57Ok3lRAynsQR7qj1lNydszJMpocKgEoZcxURVD1GSd9M3dRFwwzCP1wJYrwRs4pCN/3yiynPSdmSRnmLdZNCe90Vo00nfveuiTJzhcmn8ip2SsEd/xUF2omEjLdzjPacfaeuuGB29Km194rnsQ4xZHPI6TInX3qO+TnK0g/LXVaRkiLyH7KElQf/TcVLJ8cIgflohduHV0j3dv6dzOx+b/GAnQA8jxqADTRgfTfKZHNjCBOZtPoV2Pc0lfK3FV/HSvYBIrFN+8wg0hRbBD+8h/0WQIDAQAB"
 }
