@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SenKey",
-  "version": "1.2.17",
+  "version": "1.3.0",
   "description": "Store and autofill passwords from your own backend with Google sign-in and client-side encryption.",
   "permissions": [
     "activeTab",

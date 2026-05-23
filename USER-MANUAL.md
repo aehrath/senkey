@@ -30,6 +30,7 @@ The main tabs are:
 - `Fill`
 - `Add`
 - `⚙`
+- `Help`
 
 ## Fill tab
 
@@ -46,6 +47,10 @@ Each credential appears as a card with:
 ### Folders
 
 Credentials can be grouped into folders. Folders can be nested using `/` (for example, `Work/Clients`). Folders are collapsible, and their collapsed or expanded state is remembered between sessions.
+
+Click `✎` on a folder header to rename that folder path. If you rename it to an
+existing folder path, SenKey automatically merges the credentials into that
+existing folder.
 
 ### Fill a credential
 
@@ -253,6 +258,7 @@ Common success messages:
 - `Keys exported`
 - `Bookmarks exported`
 - `✓ Bookmarks imported`
+- `✓ Folder renamed`
 - `Deleted`
 - `Signed out`
 - `Opening and filling ...`
@@ -267,6 +273,7 @@ Common error messages:
 - `No active tab`
 - `Cannot fill on this page`
 - `No fields found ...`
+- `Cannot move a folder inside itself`
 
 ## Typical daily use
 

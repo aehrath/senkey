@@ -8,6 +8,7 @@ It is built around four ideas:
 - each Google user gets a separate credential store
 - saved entries can remember a full login page URL, not just a domain
 - you can run the backend on simple PHP hosting or on Google Cloud Run
+- bookmark backups stay local unless you choose to move the exported file
 
 ## What SenKey does
 
@@ -17,6 +18,7 @@ It is built around four ideas:
 - Stores a login URL so a credential can reopen the correct sign-in page later
 - Can navigate to a saved login page and autofill after the page loads
 - Keeps data separated by signed-in Google user
+- Groups credentials in folders that can be renamed or merged
 - Exports and imports browser bookmarks from Settings
 
 ## Project layout
@@ -59,6 +61,7 @@ cp .env.example .env
 
 - `PROJECT_ID`
 - `REGION`
+- `CHROME_EXTENSION_ID` if you are not using the published extension ID
 - `API_KEY`, or leave it blank so `./deploy.sh` generates one automatically
 
 3. Deploy the Cloud Run backend:
@@ -242,6 +245,8 @@ Daily use:
   Click a saved credential to fill the current login page or open the saved login page and fill there. Credentials are grouped by folder when folders are assigned.
 - `Add`
   Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`.
+- `Settings`
+  Sign in, save backend settings, back up encryption keys, and export or import bookmarks.
 - `Help`
   Open the built-in help page.
 
@@ -262,6 +267,16 @@ That login URL helps SenKey:
 - improve fill reliability on sites with custom login routes
 
 SenKey updates login URLs only when it believes the current page is a real login page.
+
+## Folder Behavior
+
+Use the `Folder` field to group credentials. Nested folders use `/`, such as
+`Work/Clients`.
+
+Click `✎` on a folder header to rename the folder path. If the destination
+folder already exists, SenKey automatically merges the credentials into that
+folder. Existing credentials are not duplicated or deleted; only their local
+folder assignments are updated.
 
 ## Security Model
 

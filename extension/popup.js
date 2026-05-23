@@ -33,6 +33,10 @@ function folderPathParts(path) {
   return result;
 }
 
+function normalizeFolderPath(path) {
+  return (path || '').trim().split('/').map(p => p.trim()).filter(Boolean).join('/');
+}
+
 async function getLoginUrlOverrides() {
   const { loginUrlOverrides } = await chrome.storage.local.get('loginUrlOverrides');
   return loginUrlOverrides || {};
@@ -46,8 +50,10 @@ async function setLoginUrlOverride(id, loginUrl) {
 }
 
 async function setFolderAssignment(id, folder) {
-  if (!id || !folder) return;
-  folderAssignments[id] = folder;
+  if (!id) return;
+  const normalized = normalizeFolderPath(folder);
+  if (!normalized) delete folderAssignments[id];
+  else folderAssignments[id] = normalized;
   await chrome.storage.local.set({ folderAssignments });
 }
 
@@ -55,6 +61,45 @@ async function removeFolderAssignment(id) {
   if (!id) return;
   delete folderAssignments[id];
   await chrome.storage.local.set({ folderAssignments });
+}
+
+async function renameFolder(oldPath, nextPath) {
+  const from = normalizeFolderPath(oldPath);
+  const to = normalizeFolderPath(nextPath);
+  if (!from || !to || from === to) return false;
+  if (to.startsWith(`${from}/`)) {
+    throw new Error('Cannot move a folder inside itself');
+  }
+
+  let changed = false;
+  for (const [id, path] of Object.entries(folderAssignments)) {
+    const current = normalizeFolderPath(path);
+    if (current === from || current.startsWith(`${from}/`)) {
+      folderAssignments[id] = `${to}${current.slice(from.length)}`;
+      changed = true;
+    }
+  }
+  if (!changed) return false;
+
+  const nextCollapsedFolders = new Set();
+  for (const path of collapsedFolders) {
+    const current = normalizeFolderPath(path);
+    nextCollapsedFolders.add(
+      current === from || current.startsWith(`${from}/`)
+        ? `${to}${current.slice(from.length)}`
+        : current
+    );
+  }
+  collapsedFolders.clear();
+  for (const path of nextCollapsedFolders) collapsedFolders.add(path);
+
+  await chrome.storage.local.set({
+    folderAssignments,
+    collapsedFolders: [...collapsedFolders],
+  });
+  updateFolderSuggestions();
+  renderCredentials();
+  return true;
 }
 
 function updateFolderSuggestions() {
@@ -389,9 +434,15 @@ function renderNode(name, node) {
   count.className = 'folder-count';
   count.textContent = `(${countCreds(node)})`;
 
+  const edit = document.createElement('button');
+  edit.className = 'btn-icon folder-edit';
+  edit.type = 'button';
+  edit.title = 'Rename folder';
+  edit.textContent = '✎';
+
   const header = document.createElement('div');
   header.className = 'folder-header';
-  header.append(tog, label, count);
+  header.append(tog, label, count, edit);
 
   const cards = document.createElement('div');
   cards.className = 'folder-cards' + (collapsedFolders.has(fullPath) ? ' hidden' : '');
@@ -402,6 +453,18 @@ function renderNode(name, node) {
     if (collapsed) collapsedFolders.add(fullPath);
     else collapsedFolders.delete(fullPath);
     chrome.storage.local.set({ collapsedFolders: [...collapsedFolders] });
+  });
+
+  edit.addEventListener('click', async e => {
+    e.stopPropagation();
+    const nextPath = window.prompt('Rename folder path. Existing folders are merged automatically.', fullPath);
+    if (nextPath === null) return;
+    try {
+      const changed = await renameFolder(fullPath, nextPath);
+      showToast(changed ? '✓ Folder renamed' : 'Folder name unchanged', changed ? 'ok' : 'err');
+    } catch (err) {
+      showToast(err.message || 'Could not rename folder', 'err');
+    }
   });
 
   for (const childName of Object.keys(node.children).sort(byName)) {

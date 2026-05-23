@@ -22,7 +22,7 @@ SenKey is built for people and teams who want:
 - Google account based user separation
 - client-side password encryption before upload
 - saved login URLs for reopening the correct sign-in page later
-- folder organization for grouping credentials
+- folder organization with rename and merge support
 - bookmark backup and restore from the Settings tab
 - a lightweight, focused password fill workflow
 
@@ -52,7 +52,7 @@ Key features:
   If you are not already on the right login page, SenKey can open the saved login page and autofill after navigation.
 
 - Folder organization
-  Credentials can be assigned to folders so related logins stay grouped and easy to find.
+  Credentials can be assigned to folders so related logins stay grouped and easy to find. Folder paths can be renamed, and renaming to an existing folder merges the contents automatically.
 
 - Support for modern login flows
   SenKey includes logic for many standard, SPA, shadow DOM, and multi-step login forms.
@@ -89,6 +89,8 @@ SenKey is designed to stay focused:
 - save credentials
 - reopen the correct login page
 - autofill reliably
+- keep folders organized
+- back up bookmarks on demand
 - keep your backend under your control
 
 ## Category suggestion
@@ -108,7 +110,7 @@ Productivity
 
 ## Single purpose statement
 
-SenKey stores encrypted website credentials on a user-controlled backend and autofills them on login pages.
+SenKey stores encrypted website credentials on a user-controlled backend, autofills them on login pages, and provides user-initiated bookmark backup and restore.
 
 ## Permissions justification
 
@@ -118,7 +120,7 @@ Used for Google sign-in so SenKey can separate stored credentials by signed-in u
 
 ### `storage`
 
-Used to save extension settings, local encryption keys, and lightweight local extension state.
+Used to save extension settings, local encryption keys, folder assignments, login URL overrides, and lightweight local extension state.
 
 ### `activeTab`
 

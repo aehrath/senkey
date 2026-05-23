@@ -228,6 +228,14 @@
   .folder-toggle.collapsed { transform: rotate(-90deg); }
   .folder-name { flex: 1; }
   .folder-count { color: var(--border2); font-weight: 500; }
+  .folder-edit {
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  .folder-header:hover .folder-edit,
+  .folder-edit:focus-visible {
+    opacity: 1;
+  }
   .folder-cards {
     display: flex;
     flex-direction: column;
