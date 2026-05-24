@@ -8,7 +8,7 @@ Before SenKey can save or fill credentials, complete this one-time setup:
 
 1. Click the SenKey icon in your browser toolbar.
 2. Click `⚙`.
-3. In `Google Account`, click `Sign in with Google`.
+3. In `Google Account`, click `Sign In With Google`.
 4. Complete the Google sign-in window.
 5. In `Server Configuration`, enter `API URL`.
 6. Enter `API Key`.
@@ -48,6 +48,9 @@ Each credential appears as a card with:
 
 Credentials can be grouped into folders. Folders can be nested using `/` (for example, `Work/Clients`). Folders are collapsible, and their collapsed or expanded state is remembered between sessions.
 
+Folder paths are saved with your credentials in the SenKey bucket, so they
+follow the signed-in Google user across browsers.
+
 Click `✎` on a folder header to rename that folder path. If you rename it to an
 existing folder path, SenKey automatically merges the credentials into that
 existing folder.
@@ -63,6 +66,9 @@ SenKey will either:
 
 - fill the current login page, or
 - open the saved login page and fill there
+
+When the current tab is already a saved login page, SenKey briefly shows an
+`Active` fill button at the top of the credential list.
 
 If the fill succeeds, SenKey shows `✓ Filled!`
 
@@ -80,8 +86,8 @@ If deletion succeeds, SenKey shows `Deleted`.
 
 ### Messages you may see
 
-- `Loading...`
-- `Fetching from server...`
+- `Loading…`
+- `Fetching from server…`
 - `No credentials saved yet. Use the Add tab to add one.`
 
 ## Add tab
@@ -98,7 +104,7 @@ Visible fields:
 
 Visible buttons:
 
-- `Save to Server`
+- `Save To Server`
 - `Update Credential` while editing
 - `Cancel` while editing
 - `👁` next to the password field
@@ -112,7 +118,7 @@ The `Folder` field groups the credential under a named folder in the `Fill` tab.
 3. Enter your username or email.
 4. Enter your password.
 5. Optionally keep or change `Login URL`.
-6. Click `Save to Server`.
+6. Click `Save To Server`.
 
 If save succeeds, SenKey shows `✓ Saved to server`.
 
@@ -135,13 +141,13 @@ Click the `👁` button next to the password field.
 
 ## Settings tab
 
-Use the `⚙` tab to manage sign-in, server settings, encryption keys, and bookmark backups.
+Use the `⚙` tab to manage sign-in, server settings, encryption keys, and login page backups.
 
 ### Google Account
 
 If you are signed out, you will see:
 
-- `Sign in with Google`
+- `Sign In With Google`
 
 If you are signed in, you will see:
 
@@ -152,10 +158,10 @@ If you are signed in, you will see:
 
 #### Sign in
 
-1. Click `Sign in with Google`.
+1. Click `Sign In With Google`.
 2. Complete the Google sign-in window.
 
-If sign-in succeeds, SenKey shows `✓ Signed in as ...`
+If sign-in succeeds, SenKey shows `✓ Signed in as …`
 
 Brave users should also enable `brave://settings/extensions` > `Allow Google
 login for extensions`, then sign into Google in a normal Brave tab before
@@ -164,7 +170,7 @@ signing into SenKey.
 If you are testing an unpacked custom build, run `./build.sh` and load `dist/`.
 The OAuth client IDs in `.env` must match that installed extension ID.
 
-#### Sign out
+#### Sign Out
 
 1. Open `⚙`.
 2. Click the `✕` button in the Google account card.
@@ -219,26 +225,32 @@ Anyone with this file may be able to read the passwords protected by it.
 
 If import succeeds, SenKey shows `✓ Keys imported`.
 
-### Bookmarks
+### Login Pages
 
 Visible controls:
 
-- `Export Bookmarks`
-- `Import Bookmarks`
+- `Export Login Pages`
+- `Import Login Pages`
 
-#### Export bookmarks
+#### Export login pages
 
-Click `Export Bookmarks` to download a JSON backup of the browser bookmark tree.
+Click `Export Login Pages` to download a JSON backup of the browser login page list.
+SenKey also tries to save the same backup to the bucket document that stores your
+credentials and credential folder paths. If the bucket save fails, the local JSON
+download still completes and SenKey shows the bucket error.
 
-#### Import bookmarks
+#### Import login pages
 
-1. Click `Import Bookmarks`.
-2. Choose a previously exported bookmark JSON file.
+Click `Import Login Pages` and choose a login page JSON backup. SenKey replaces the
+bucket login page backup with that file and restores the imported tree into a new
+browser folder.
 
-SenKey imports bookmarks into a new folder on the bookmarks bar. Existing
-bookmarks are not deleted or overwritten.
+Existing login pages are not deleted or overwritten.
 
-If import succeeds, SenKey shows `✓ Bookmarks imported`.
+If import succeeds, SenKey shows `✓ Login Pages imported`.
+
+If login pages change while the popup is open, SenKey saves the updated login page
+tree to the bucket automatically and tries one last save when the popup closes.
 
 ## Help button
 
@@ -256,12 +268,13 @@ Common success messages:
 - `✓ Settings saved`
 - `✓ Keys imported`
 - `Keys exported`
-- `Bookmarks exported`
-- `✓ Bookmarks imported`
+- `Login Pages exported`
+- `Downloaded backup. Bucket save failed: …`
+- `✓ Login Pages imported`
 - `✓ Folder renamed`
 - `Deleted`
 - `Signed out`
-- `Opening and filling ...`
+- `Opening and filling …`
 - `Updated saved login URL`
 
 Common error messages:
@@ -272,8 +285,9 @@ Common error messages:
 - `Invalid server URL`
 - `No active tab`
 - `Cannot fill on this page`
-- `No fields found ...`
+- `No fields found …`
 - `Cannot move a folder inside itself`
+- `Server error 400: …`
 
 ## Typical daily use
 

@@ -19,11 +19,11 @@ Instead of locking your credentials into a third-party password manager service,
 SenKey is built for people and teams who want:
 
 - their own server or cloud backend
-- Google account based user separation
+- Google-account-based user separation
 - client-side password encryption before upload
 - saved login URLs for reopening the correct sign-in page later
 - folder organization with rename and merge support
-- bookmark backup and restore from the Settings tab
+- Login Pages import/export from the Settings tab
 - a lightweight, focused password fill workflow
 
 How SenKey works:
@@ -63,9 +63,9 @@ Key features:
 - Built-in help
   The extension includes a built-in help page for setup and daily use.
 
-- Bookmark export and import
-  Export all browser bookmarks to a JSON backup and import them later into a
-  new bookmarks bar folder.
+- Login Pages import and export
+  Export browser login pages to a JSON file and the user's configured SenKey
+  bucket document, or import a JSON backup and replace the bucket backup.
 
 Who SenKey is for:
 
@@ -90,7 +90,7 @@ SenKey is designed to stay focused:
 - reopen the correct login page
 - autofill reliably
 - keep folders organized
-- back up bookmarks on demand
+- import and export login pages on demand
 - keep your backend under your control
 
 ## Category suggestion
@@ -100,7 +100,7 @@ Productivity
 ## Store tags / keywords
 
 - password manager
-- self hosted
+- self-hosted
 - autofill
 - login manager
 - credentials
@@ -110,7 +110,7 @@ Productivity
 
 ## Single purpose statement
 
-SenKey stores encrypted website credentials on a user-controlled backend, autofills them on login pages, and provides user-initiated bookmark backup and restore.
+SenKey stores encrypted website credentials on a user-controlled backend, autofills them on login pages, and provides user-initiated Login Pages import/export.
 
 ## Permissions justification
 
@@ -120,7 +120,10 @@ Used for Google sign-in so SenKey can separate stored credentials by signed-in u
 
 ### `storage`
 
-Used to save extension settings, local encryption keys, folder assignments, login URL overrides, and lightweight local extension state.
+Used to save extension settings, local encryption keys, collapsed folder state,
+login URL overrides, lightweight local extension state, and short-lived retry
+state for folder updates. Folder paths for saved credentials are stored with the
+user's encrypted credential records on the configured backend.
 
 ### `activeTab`
 
@@ -132,9 +135,11 @@ Used to inject autofill logic into the current page after the user selects a sav
 
 ### `bookmarks`
 
-Used only when the user clicks `Export Bookmarks` or `Import Bookmarks` in
-Settings. Exports create a local JSON file. Imports add bookmarks into a new
-folder on the bookmarks bar.
+Used only when the user clicks `Export Login Pages` or `Import Login Pages` in
+Settings, or when login page changes made while the popup is open are saved on
+popup close. Backups are stored in the same user bucket document as credentials
+and credential folder paths when bucket save succeeds. Exports also create a
+local JSON download. Imports add login pages into a new browser folder.
 
 ### Host permissions: `https://*/*` and `http://*/*`
 
@@ -150,14 +155,15 @@ What SenKey handles:
 - backend API URL and API key entered by the user
 - encrypted credential records stored on the user's chosen backend
 - local encryption keys stored in the browser profile
-- bookmark data exported or imported only when the user explicitly clicks the
-  bookmark backup controls
+- login page data imported from or exported to the user's configured backend when
+  the user clicks the login page backup controls, login page JSON files downloaded
+  by the user, plus login page changes saved when the popup closes
 
 What SenKey does not do:
 
 - SenKey does not run a shared hosted credential storage service
 - SenKey does not require sending plaintext passwords to a SenKey-operated cloud service
-- SenKey does not send bookmark backups to any SenKey-operated service
+- SenKey does not send login page backups to any SenKey-operated service
 
 ## Support URL suggestion
 
@@ -186,7 +192,7 @@ Your backend. Your credentials. Fast login autofill in Chrome.
 1. Fill tab showing saved credentials grouped by folder
 2. Add tab with `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder` fields
 3. Settings tab with Google sign-in and server configuration
-4. Bookmark and encryption backup controls in Settings
+4. Login Pages and encryption backup controls in Settings
 5. Built-in Help page
 6. A before-and-after autofill example on a login page
 

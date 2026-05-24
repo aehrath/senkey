@@ -22,7 +22,7 @@ Fill in:
 
 - `PROJECT_ID`
 - `REGION`
-- `CHROME_EXTENSION_ID`
+- `CHROME_EXTENSION_ID` only if you are not using the published extension ID
 - `API_KEY`, or leave it blank for automatic generation
 
 For the published SenKey extension:
@@ -57,7 +57,7 @@ If `API_KEY` is blank, the script generates one and writes it back into `.env`.
 SenKey no longer uses Cloud Run source deploys, so new deploys should not create
 or recreate a `run-sources...` bucket. If an older deploy already created one,
 you can delete that bucket after confirming no deploy is currently running.
-SenKey stores credentials only in `${PROJECT_ID}-senkey`.
+SenKey stores user data only in `${PROJECT_ID}-senkey`.
 
 ## 4. Configure the extension
 
@@ -65,7 +65,7 @@ When deploy finishes, copy the printed values into SenKey:
 
 1. Open the extension.
 2. Open `⚙`.
-3. Sign in with Google.
+3. Sign In With Google.
 4. Paste `API URL`.
 5. Paste `API Key`.
 6. Click `Save Settings`.
@@ -94,3 +94,6 @@ When deploy finishes, copy the printed values into SenKey:
   builds, also check the OAuth setup in the repo README.
 - `GCS_BUCKET env var not set`
   Redeploy and confirm the latest Cloud Run revision is active.
+- `Server error 400` when exporting login pages
+  Redeploy and confirm the active Cloud Run revision includes the login page API
+  route.

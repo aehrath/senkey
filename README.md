@@ -2,13 +2,13 @@
 
 SenKey is a Chromium extension that stores and autofills credentials from your own backend instead of a third-party password manager.
 
-It is built around four ideas:
+It is built around five ideas:
 
 - credentials are encrypted in the extension before upload
 - each Google user gets a separate credential store
 - saved entries can remember a full login page URL, not just a domain
 - you can run the backend on simple PHP hosting or on Google Cloud Run
-- bookmark backups stay local unless you choose to move the exported file
+- credential folders and login page backups are stored in the signed-in user's bucket document
 
 ## What SenKey does
 
@@ -19,7 +19,7 @@ It is built around four ideas:
 - Can navigate to a saved login page and autofill after the page loads
 - Keeps data separated by signed-in Google user
 - Groups credentials in folders that can be renamed or merged
-- Exports and imports browser bookmarks from Settings
+- Imports and exports browser login page backups from Settings
 
 ## Project layout
 
@@ -61,7 +61,7 @@ cp .env.example .env
 
 - `PROJECT_ID`
 - `REGION`
-- `CHROME_EXTENSION_ID` if you are not using the published extension ID
+- `CHROME_EXTENSION_ID` only if you are not using the published extension ID
 - `API_KEY`, or leave it blank so `./deploy.sh` generates one automatically
 
 3. Deploy the Cloud Run backend:
@@ -101,7 +101,10 @@ What the deploy script does:
 - sets `API_KEY`, `GCS_BUCKET`, and `CHROME_EXTENSION_ID` on Cloud Run
 - prints the final service URL and API key
 
-SenKey no longer uses Cloud Run source deploys, so new deploys should not create or recreate a `run-sources...` bucket. If an older deploy already created one, you can delete that bucket after confirming no deploy is currently running. SenKey stores credentials only in `${PROJECT_ID}-senkey`.
+SenKey no longer uses Cloud Run source deploys, so new deploys should not create
+or recreate a `run-sources...` bucket. If an older deploy already created one,
+you can delete that bucket after confirming no deploy is currently running.
+SenKey stores user data only in `${PROJECT_ID}-senkey`.
 
 What you set manually in `.env`:
 
@@ -127,7 +130,11 @@ Detailed Cloud Run docs live in:
 
 ## Self-Hosted PHP Deployment
 
-A lightweight single-file PHP backend (`credentials.php`) is available as a separate optional component not included in this repository. It stores one JSON file per Google user and supports `GET`, `POST`, and `DELETE`.
+A lightweight single-file PHP backend (`credentials.php`) is available as a separate optional component not included in this repository. It stores one JSON file per Google user and supports credential `GET`, `POST`, and `DELETE` requests.
+
+The Cloud Run backend in this repository is the reference implementation for
+the full current API, including bucket-backed credential folders and login page
+backup import/export.
 
 Basic setup:
 
@@ -234,7 +241,7 @@ First-time setup:
 
 1. Open SenKey from the browser toolbar.
 2. Open the `⚙` tab.
-3. Sign in with Google.
+3. Sign In With Google.
 4. Enter `API URL`.
 5. Enter `API Key`.
 6. Save settings.
@@ -246,13 +253,15 @@ Daily use:
 - `Add`
   Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`.
 - `Settings`
-  Sign in, save backend settings, back up encryption keys, and export or import bookmarks.
+  Sign in, save backend settings, back up encryption keys, and import or export Login Pages.
 - `Help`
   Open the built-in help page.
 
-Settings also includes bookmark backup controls. `Export Bookmarks` downloads a
-JSON file containing the browser bookmark tree. `Import Bookmarks` adds a JSON
-backup into a new folder on the bookmarks bar.
+Settings also includes Login Pages backup controls. `Export Login Pages` downloads a
+JSON backup of the current browser login page list and also tries to write that
+same backup to the signed-in user's bucket document. If the bucket save fails,
+the local JSON download still completes. `Import Login Pages` reads a JSON backup,
+replaces the bucket login page backup, and restores it into a new browser folder.
 
 The full user-facing guide is in `USER-MANUAL.md`, and the installed extension also includes its own help page at `extension/manual.html`.
 
@@ -275,8 +284,11 @@ Use the `Folder` field to group credentials. Nested folders use `/`, such as
 
 Click `✎` on a folder header to rename the folder path. If the destination
 folder already exists, SenKey automatically merges the credentials into that
-folder. Existing credentials are not duplicated or deleted; only their local
-folder assignments are updated.
+folder. Existing credentials are not duplicated or deleted; their saved folder
+paths are updated on the backend so the structure follows the signed-in Google
+user across browsers. If a folder update has not appeared in the next backend
+fetch yet, the extension keeps a temporary local retry entry and pushes it again
+on the next popup open.
 
 ## Security Model
 
@@ -285,8 +297,12 @@ folder assignments are updated.
 - Google sign-in separates one user's data from another user's data.
 - The API key acts as a shared server-level gate.
 - Exported SenKey keys are sensitive and should be stored privately.
-- Bookmark exports are local JSON files created only when the user requests
-  them. Imported bookmarks are added to a new bookmarks bar folder.
+- Login page backups are stored in the user's configured bucket when the user
+  clicks `Export Login Pages`, imports a login page backup, or changes login pages
+  while the popup is open. Export also creates a local JSON download, and
+  imports are added to a new browser folder.
+- Credential folder paths are saved with credential records in the bucket.
+  Browser-local storage is used only for UI state and short-lived retry state.
 
 ## Browser Support
 

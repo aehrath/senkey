@@ -28,6 +28,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     handleDelete(msg.id).then(sendResponse).catch(err => sendResponse({ error: err.message }));
     return true;
   }
+  if (msg.type === 'FETCH_LOGINPAGES' || msg.type === 'FETCH_BOOKMARKS') {
+    handleFetchLoginPages().then(sendResponse).catch(err => sendResponse({ error: err.message }));
+    return true;
+  }
+  if (msg.type === 'SAVE_LOGINPAGES' || msg.type === 'SAVE_BOOKMARKS') {
+    handleSaveLoginPages(msg.payload).then(sendResponse).catch(err => sendResponse({ error: err.message }));
+    return true;
+  }
   if (msg.type === 'RESET_KEYS') {
     _keyPair = null;
     sendResponse({ success: true });
@@ -301,7 +309,7 @@ async function getTokenWithWebAuthFlow() {
 async function makeHeaders(includeContentType = false) {
   const { apiKey } = await getConfig();
   const token = await getGoogleToken();
-  if (!token) throw new Error('Sign in with Google first (open the Settings tab)');
+  if (!token) throw new Error('Sign In With Google first (open the Settings tab)');
   const headers = {
     'X-API-Key': apiKey || '',
     'Authorization': `Bearer ${token}`,
@@ -316,7 +324,7 @@ async function handleFetch() {
   const { serverUrl } = await getConfig();
   if (!serverUrl) throw new Error('Server URL not configured. Open Settings.');
   const res = await fetch(serverUrl, { headers: await makeHeaders() });
-  if (!res.ok) throw new Error(`Server error ${res.status}`);
+  if (!res.ok) throw new Error(await getServerErrorMessage(res));
   const data = await res.json();
   const credentials = await Promise.all(
     (data.credentials || []).map(async cred => ({
@@ -336,7 +344,46 @@ async function handleSave(payload) {
     headers: await makeHeaders(true),
     body: JSON.stringify(encrypted),
   });
-  if (!res.ok) throw new Error(`Server error ${res.status}`);
+  if (!res.ok) throw new Error(await getServerErrorMessage(res));
+  return res.json();
+}
+
+async function getServerErrorMessage(res) {
+  let detail = '';
+  try {
+    const data = await res.clone().json();
+    detail = data?.error || data?.message || '';
+  } catch {
+    try {
+      detail = (await res.clone().text()).trim();
+    } catch {}
+  }
+  return detail ? `Server error ${res.status}: ${detail}` : `Server error ${res.status}`;
+}
+
+function withResource(url, resource) {
+  const next = new URL(url);
+  next.searchParams.set('resource', resource);
+  return next.toString();
+}
+
+async function handleFetchLoginPages() {
+  const { serverUrl } = await getConfig();
+  if (!serverUrl) throw new Error('Server URL not configured. Open Settings.');
+  const res = await fetch(withResource(serverUrl, 'loginpages'), { headers: await makeHeaders() });
+  if (!res.ok) throw new Error(await getServerErrorMessage(res));
+  return res.json();
+}
+
+async function handleSaveLoginPages(payload) {
+  const { serverUrl } = await getConfig();
+  if (!serverUrl) throw new Error('Server URL not configured.');
+  const res = await fetch(withResource(serverUrl, 'loginpages'), {
+    method: 'POST',
+    headers: await makeHeaders(true),
+    body: JSON.stringify({ roots: payload?.roots || [] }),
+  });
+  if (!res.ok) throw new Error(await getServerErrorMessage(res));
   return res.json();
 }
 
@@ -348,7 +395,7 @@ async function handleDelete(id) {
     headers: await makeHeaders(true),
     body: JSON.stringify({ id }),
   });
-  if (!res.ok) throw new Error(`Server error ${res.status}`);
+  if (!res.ok) throw new Error(await getServerErrorMessage(res));
   return res.json();
 }
 

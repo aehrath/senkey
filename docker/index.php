@@ -1,9 +1,10 @@
 <?php
 /**
- * SenKey Credentials API — Cloud Run + GCS edition, multi-user
+ * SenKey API — Cloud Run + GCS edition, multi-user
  *
  * Auth: X-API-Key (server access gate) + Google OAuth Bearer token (per-user identity)
- * Each user's credentials are stored as credentials/{google_sub}.json in the GCS bucket.
+ * Each user's credentials, credential folder paths, and login page backup are stored
+ * in credentials/{google_sub}.json in the GCS bucket.
  *
  * Environment variables (set via deploy.sh / Cloud Run console):
  *   API_KEY     → shared secret distributed to your users
@@ -70,7 +71,46 @@ function gcsWrite(string $bucket, string $object, array $data, string $token): v
         'ignore_errors' => true,
         'timeout'       => 10,
     ]]);
-    @file_get_contents($url, false, $ctx);
+    $result = @file_get_contents($url, false, $ctx);
+    $status = $http_response_header[0] ?? '';
+    if ($result === false || !preg_match('/\s2\d\d\s/', $status)) {
+        throw new RuntimeException('Could not write data to GCS');
+    }
+}
+
+function normalizeStore(array $raw): array {
+    if (isset($raw['credentials']) && is_array($raw['credentials'])) {
+        $loginPages = [];
+        if (isset($raw['loginpages']) && is_array($raw['loginpages'])) {
+            $loginPages = $raw['loginpages'];
+        } elseif (isset($raw['bookmarks']) && is_array($raw['bookmarks'])) {
+            $loginPages = $raw['bookmarks'];
+        }
+        return [
+            'credentials' => $raw['credentials'],
+            'loginpages'  => $loginPages,
+        ];
+    }
+    return [
+        'credentials' => $raw,
+        'loginpages'  => [],
+    ];
+}
+
+function normalizeLoginPageRootsPayload(array $body): array {
+    if (isset($body['roots']) && is_array($body['roots'])) return $body['roots'];
+    if (isset($body['loginpages']) && is_array($body['loginpages'])) {
+        $loginPages = $body['loginpages'];
+        if (isset($loginPages['roots']) && is_array($loginPages['roots'])) return $loginPages['roots'];
+        if (array_is_list($loginPages)) return $loginPages;
+    }
+    if (isset($body['bookmarks']) && is_array($body['bookmarks'])) {
+        $legacy = $body['bookmarks'];
+        if (isset($legacy['roots']) && is_array($legacy['roots'])) return $legacy['roots'];
+        if (array_is_list($legacy)) return $legacy;
+    }
+    if (array_is_list($body)) return $body;
+    return [];
 }
 
 // ---- Verify user's Google token and return their stable sub ----
@@ -106,33 +146,59 @@ $gcsObject = 'credentials/' . preg_replace('/[^a-z0-9]/i', '', $userId) . '.json
 try {
     $saToken = getServiceAccountToken();
     $body    = json_decode(file_get_contents('php://input'), true) ?? [];
-    $creds   = gcsRead($gcsBucket, $gcsObject, $saToken);
+    $store   = normalizeStore(gcsRead($gcsBucket, $gcsObject, $saToken));
+    $creds   = $store['credentials'];
     $method  = $_SERVER['REQUEST_METHOD'];
+    $resource = trim($_GET['resource'] ?? '');
 
-    if ($method === 'GET') {
+    if ($method === 'GET' && ($resource === 'loginpages' || $resource === 'bookmarks')) {
+        echo json_encode(['loginpages' => $store['loginpages'], 'bookmarks' => $store['loginpages']]);
+
+    } elseif ($method === 'POST' && ($resource === 'loginpages' || $resource === 'bookmarks')) {
+        $roots = normalizeLoginPageRootsPayload($body);
+        if (!$roots && !isset($body['roots']) && !isset($body['loginpages']) && !isset($body['bookmarks']) && !array_is_list($body)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'login page roots must be an array']); exit;
+        }
+        $store['loginpages'] = [
+            'updated' => date('c'),
+            'roots'   => $roots,
+        ];
+        gcsWrite($gcsBucket, $gcsObject, $store, $saToken);
+        echo json_encode(['success' => true, 'updated' => $store['loginpages']['updated']]);
+
+    } elseif ($method === 'GET') {
         echo json_encode(['credentials' => array_values($creds)]);
 
     } elseif ($method === 'POST') {
         $domain   = trim($body['domain']   ?? '');
         $username = trim($body['username'] ?? '');
         $password = trim($body['password'] ?? '');
+        $hasLoginUrl = array_key_exists('loginUrl', $body);
+        $hasFolder   = array_key_exists('folder', $body);
         $loginUrl = trim($body['loginUrl'] ?? '');
+        $folder   = trim($body['folder']   ?? '');
         if (!$domain || !$username || !$password) {
             http_response_code(400);
             echo json_encode(['error' => 'domain, username, and password required']); exit;
         }
         $id = md5($domain . '|' . $username);
         $entry = compact('id', 'domain', 'username', 'password') + ['updated' => date('c')];
-        if ($loginUrl !== '') $entry['loginUrl'] = $loginUrl;
+        if ($hasLoginUrl && $loginUrl !== '') $entry['loginUrl'] = $loginUrl;
+        if (!$hasLoginUrl && !empty($creds[$id]['loginUrl'])) $entry['loginUrl'] = $creds[$id]['loginUrl'];
+        if ($hasFolder && $folder !== '') $entry['folder'] = $folder;
+        if (!$hasFolder && !empty($creds[$id]['folder'])) $entry['folder'] = $creds[$id]['folder'];
         $creds[$id] = $entry;
-        gcsWrite($gcsBucket, $gcsObject, $creds, $saToken);
+        $store['credentials'] = $creds;
+        gcsWrite($gcsBucket, $gcsObject, $store, $saToken);
         echo json_encode(['success' => true, 'id' => $id]);
 
     } elseif ($method === 'DELETE') {
         $id = trim($body['id'] ?? '');
         if (!$id) { http_response_code(400); echo json_encode(['error' => 'id required']); exit; }
         unset($creds[$id]);
-        gcsWrite($gcsBucket, $gcsObject, $creds, $saToken);
+        $store['credentials'] = $creds;
+        gcsWrite($gcsBucket, $gcsObject, $store, $saToken);
         echo json_encode(['success' => true]);
 
     } else {

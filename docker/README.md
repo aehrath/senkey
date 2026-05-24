@@ -7,14 +7,14 @@ It is the server-side part of SenKey that:
 - receives requests from the browser extension
 - checks the shared `X-API-Key`
 - verifies the signed-in Google user
-- stores one credential file per Google user in Google Cloud Storage
+- stores one user data file per Google user in Google Cloud Storage
 
 ## What this backend uses
 
 - Cloud Run for the PHP API
 - Cloud Build to build the backend container image
 - Artifact Registry to store the backend container image
-- Google Cloud Storage for credential data
+- Google Cloud Storage for credential and login page backup data
 
 ## Files in this folder
 
@@ -51,7 +51,7 @@ Then fill in:
 
 - `PROJECT_ID`
 - `REGION`
-- `CHROME_EXTENSION_ID`
+- `CHROME_EXTENSION_ID` only if you are not using the published extension ID
 - `API_KEY` if you want to choose your own shared key
 
 If `API_KEY` is blank, `deploy.sh` will generate a strong key, save it back into `.env`, and print it at the end.
@@ -91,7 +91,10 @@ During deploy, the script creates or reuses:
 - a storage bucket named `${PROJECT_ID}-senkey`
 - an Artifact Registry repository named `senkey`
 
-SenKey no longer uses Cloud Run source deploys, so new deploys should not create or recreate a `run-sources...` bucket. If an older deploy already created one, you can delete that bucket after confirming no deploy is currently running. SenKey stores credential files only in `${PROJECT_ID}-senkey`.
+SenKey no longer uses Cloud Run source deploys, so new deploys should not create
+or recreate a `run-sources...` bucket. If an older deploy already created one,
+you can delete that bucket after confirming no deploy is currently running.
+SenKey stores user data only in `${PROJECT_ID}-senkey`.
 
 It also sets these Cloud Run environment variables automatically:
 
@@ -113,7 +116,7 @@ Use those values in the extension:
 
 1. Open SenKey.
 2. Open the `⚙` tab.
-3. Sign in with Google.
+3. Sign In With Google.
 4. Paste the Cloud Run service URL into `API URL`.
 5. Paste the same key into `API Key`.
 6. Click `Save Settings`.
@@ -144,7 +147,7 @@ Meaning:
 - `API_KEY`
   Shared secret between the extension and backend.
 - `GCS_BUCKET`
-  Storage bucket for per-user credential JSON files.
+  Storage bucket for per-user credential and login page backup JSON files.
 - `CHROME_EXTENSION_ID`
   Kept in the Cloud Run config for consistency and reference.
 
@@ -156,11 +159,17 @@ Each signed-in Google user gets a separate Cloud Storage object:
 credentials/<google-sub-sanitized>.json
 ```
 
-Inside that file, credentials are keyed by:
+The user document contains:
 
-```text
-md5(domain + "|" + username)
-```
+- `credentials`
+  Credential records keyed by `md5(domain + "|" + username)`. Each record
+  includes the encrypted password plus optional `loginUrl` and `folder` fields.
+- `loginpages`
+  The browser login page backup written by successful `Export Login Pages` bucket
+  saves, imports, and login page autosave while the popup is open.
+
+The `folder` field lets credential folder structure follow the signed-in Google
+user across browsers.
 
 ## Troubleshooting
 
@@ -203,6 +212,13 @@ Check that:
 
 - the deployment targeted the correct project
 - the storage bucket name matches the deployed service config
+
+### Login Pages export shows `Server error 400`
+
+Check that the latest backend is deployed and the active Cloud Run revision
+includes the `?resource=loginpages` route. Older credential-only revisions reject
+login page export requests with a 400 because they expect `domain`, `username`,
+and `password` fields.
 
 ## Related docs
 

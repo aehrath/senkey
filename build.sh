@@ -46,7 +46,7 @@ fi
 rm -rf dist
 mkdir -p dist
 
-cp extension/popup.html extension/popup.js extension/background.js extension/content.js extension/manual.html extension/oauth_config.js dist/
+cp extension/popup.html extension/popup.js extension/background.js extension/content.js extension/manual.html extension/manual.js extension/oauth_config.js dist/
 cp -r extension/icons dist/
 
 if [ -z "${EXTENSION_KEY:-}" ]; then

@@ -2,14 +2,19 @@
 
 let allCredentials = [];
 let currentDomain  = '';
+let currentPageUrl = '';
 let editingCredential = null;
 let folderAssignments = {};
 const collapsedFolders = new Set();
+let activeLoginActionHidden = false;
+let activeLoginActionTimer = null;
 const SPECIAL_LOGIN_URLS = {
   'auth.digikey.com': 'https://www.digikey.com/MyDigiKey/Login?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2F',
   'www.digikey.com': 'https://www.digikey.com/MyDigiKey/Login?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2F',
   'digikey.com': 'https://www.digikey.com/MyDigiKey/Login?site=US&lang=en&returnurl=https%3A%2F%2Fwww.digikey.com%2F',
 };
+const PENDING_FOLDER_SYNCS_KEY = 'pendingFolderSyncs';
+const ACTIVE_LOGIN_ACTION_MS = 6000;
 
 const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
@@ -54,13 +59,45 @@ async function setFolderAssignment(id, folder) {
   const normalized = normalizeFolderPath(folder);
   if (!normalized) delete folderAssignments[id];
   else folderAssignments[id] = normalized;
-  await chrome.storage.local.set({ folderAssignments });
+}
+
+async function getPendingFolderSyncs() {
+  const data = await chrome.storage.local.get(PENDING_FOLDER_SYNCS_KEY);
+  return data[PENDING_FOLDER_SYNCS_KEY] || {};
+}
+
+async function setPendingFolderSync(id, folder) {
+  if (!id) return;
+  const pending = await getPendingFolderSyncs();
+  pending[id] = normalizeFolderPath(folder);
+  await chrome.storage.local.set({ [PENDING_FOLDER_SYNCS_KEY]: pending });
+}
+
+async function clearPendingFolderSync(id) {
+  if (!id) return;
+  const pending = await getPendingFolderSyncs();
+  if (!(id in pending)) return;
+  delete pending[id];
+  await chrome.storage.local.set({ [PENDING_FOLDER_SYNCS_KEY]: pending });
+}
+
+async function saveCredentialRecord(cred, folder = '') {
+  const payload = {
+    domain: cred.domain,
+    username: cred.username,
+    password: cred.password,
+    loginUrl: canonicalLoginUrl(cred.loginUrl || ''),
+    folder: normalizeFolderPath(folder),
+  };
+  const res = await chrome.runtime.sendMessage({ type: 'SAVE_CREDENTIAL', payload });
+  if (res?.error) throw new Error(res.error);
+  return res;
 }
 
 async function removeFolderAssignment(id) {
   if (!id) return;
   delete folderAssignments[id];
-  await chrome.storage.local.set({ folderAssignments });
+  await clearPendingFolderSync(id);
 }
 
 async function renameFolder(oldPath, nextPath) {
@@ -81,6 +118,15 @@ async function renameFolder(oldPath, nextPath) {
   }
   if (!changed) return false;
 
+  const affectedCreds = allCredentials.filter(cred => {
+    const current = normalizeFolderPath(folderAssignments[cred.id]);
+    return current === to || current.startsWith(`${to}/`);
+  });
+  for (const cred of affectedCreds) {
+    await setPendingFolderSync(cred.id, folderAssignments[cred.id]);
+    await saveCredentialRecord(cred, folderAssignments[cred.id]);
+  }
+
   const nextCollapsedFolders = new Set();
   for (const path of collapsedFolders) {
     const current = normalizeFolderPath(path);
@@ -93,10 +139,7 @@ async function renameFolder(oldPath, nextPath) {
   collapsedFolders.clear();
   for (const path of nextCollapsedFolders) collapsedFolders.add(path);
 
-  await chrome.storage.local.set({
-    folderAssignments,
-    collapsedFolders: [...collapsedFolders],
-  });
+  await chrome.storage.local.set({ collapsedFolders: [...collapsedFolders] });
   updateFolderSuggestions();
   renderCredentials();
   return true;
@@ -116,6 +159,18 @@ async function removeLoginUrlOverride(id) {
   if (!(id in loginUrlOverrides)) return;
   delete loginUrlOverrides[id];
   await chrome.storage.local.set({ loginUrlOverrides });
+}
+
+function getSavedCredentialId(saveResponse, domain, username) {
+  if (saveResponse?.id) return saveResponse.id;
+  if (
+    editingCredential?.id &&
+    (editingCredential.domain || '').trim() === domain &&
+    (editingCredential.username || '').trim() === username
+  ) {
+    return editingCredential.id;
+  }
+  return '';
 }
 
 // ---- Tab switching ----
@@ -218,7 +273,7 @@ function showAddTab() {
 function resetCredentialForm() {
   editingCredential = null;
   document.getElementById('addSectionTitle').textContent = 'Save new credential';
-  document.getElementById('saveBtn').textContent = 'Save to Server';
+  document.getElementById('saveBtn').textContent = 'Save To Server';
   document.getElementById('cancelEditBtn').style.display = 'none';
   document.getElementById('addDomain').value = '';
   document.getElementById('addUsername').value = '';
@@ -260,16 +315,7 @@ async function syncCredentialLoginUrl(cred, nextUrl) {
   const loginUrl = canonicalLoginUrl(nextUrl);
   if (!loginUrl || canonicalLoginUrl(cred.loginUrl) === loginUrl) return false;
 
-  const res = await chrome.runtime.sendMessage({
-    type: 'SAVE_CREDENTIAL',
-    payload: {
-      domain: cred.domain,
-      username: cred.username,
-      password: cred.password,
-      loginUrl,
-    },
-  });
-  if (res?.error) throw new Error(res.error);
+  await saveCredentialRecord({ ...cred, loginUrl }, folderAssignments[cred.id] || cred.folder || '');
 
   await setLoginUrlOverride(cred.id, loginUrl);
   cred.loginUrl = loginUrl;
@@ -343,19 +389,46 @@ async function loadCredentials() {
     const res = await chrome.runtime.sendMessage({ type: 'FETCH_CREDENTIALS' });
     if (res.error) throw new Error(res.error);
     const overrides = await getLoginUrlOverrides();
-    allCredentials = (res.credentials || []).map(cred =>
-      overrides[cred.id] ? { ...cred, loginUrl: overrides[cred.id] } : cred
-    );
-    const { folderAssignments: fa, collapsedFolders: cf } = await chrome.storage.local.get(['folderAssignments', 'collapsedFolders']);
-    folderAssignments = fa || {};
+    const pendingFolderSyncs = await getPendingFolderSyncs();
+    const { collapsedFolders: cf } = await chrome.storage.local.get(['collapsedFolders']);
+    allCredentials = (res.credentials || []).map(cred => {
+      const loginUrl = overrides[cred.id] || cred.loginUrl || '';
+      const storedFolder = normalizeFolderPath(cred.folder || '');
+      const hasPendingFolder = Object.prototype.hasOwnProperty.call(pendingFolderSyncs, cred.id);
+      const pendingFolder = hasPendingFolder ? normalizeFolderPath(pendingFolderSyncs[cred.id]) : '';
+      const folder = hasPendingFolder ? pendingFolder : storedFolder;
+      if (hasPendingFolder && pendingFolder === storedFolder) {
+        void clearPendingFolderSync(cred.id);
+      }
+      return { ...cred, loginUrl, folder };
+    });
+    folderAssignments = {};
+    for (const cred of allCredentials) {
+      if (cred.folder) folderAssignments[cred.id] = cred.folder;
+    }
     collapsedFolders.clear();
     for (const p of (cf || [])) collapsedFolders.add(p);
     updateUsernameSuggestions();
     updateFolderSuggestions();
     renderCredentials();
+    void retryPendingFolderSyncs();
   } catch (err) {
     list.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
     updateUsernameSuggestions();
+  }
+}
+
+async function retryPendingFolderSyncs() {
+  const pending = await getPendingFolderSyncs();
+  for (const [id, folder] of Object.entries(pending)) {
+    const cred = allCredentials.find(entry => entry.id === id);
+    if (!cred) {
+      await clearPendingFolderSync(id);
+      continue;
+    }
+    try {
+      await saveCredentialRecord(cred, folder);
+    } catch {}
   }
 }
 
@@ -374,8 +447,8 @@ function makeCard(cred) {
       <div class="cred-domain">${escHtml(cred.domain)}</div>
     </div>
     <div class="cred-actions">
-      <button class="btn-icon fill" title="Autofill this page">▶</button>
-      <button class="btn-icon edit" title="Update username/password">✎</button>
+      <button class="btn-icon fill" title="Autofill This Page">▶</button>
+      <button class="btn-icon edit" title="Update Username/Password">✎</button>
       <button class="btn-icon del"  title="Delete">✕</button>
     </div>`;
   const avatarImg = card.querySelector('.cred-avatar img');
@@ -394,6 +467,48 @@ function makeCard(cred) {
   card.querySelector('.del').addEventListener('click',  e => { e.stopPropagation(); deleteCredential(cred.id); });
   card.addEventListener('click', () => autofillPage(cred));
   return card;
+}
+
+function getActiveLoginCredential(creds) {
+  if (!currentPageUrl) return null;
+
+  const exact = creds.find(cred => canonicalLoginUrl(cred.loginUrl || '') === currentPageUrl);
+  if (exact) return exact;
+
+  if (!urlLooksLikeLoginPage(currentPageUrl)) return null;
+  return creds.find(cred => isCredentialMatch(currentDomain, cred.domain)) || null;
+}
+
+function makeActiveLoginButton(cred) {
+  const button = document.createElement('button');
+  button.className = 'active-login-fill';
+  button.type = 'button';
+  button.title = 'Fill Current Login Page';
+
+  const icon = document.createElement('span');
+  icon.className = 'active-login-icon';
+  icon.textContent = '▶';
+
+  const label = document.createElement('span');
+  label.className = 'active-login-label';
+  label.textContent = `Fill ${cred.domain || 'current login page'}`;
+
+  const badge = document.createElement('span');
+  badge.className = 'active-login-badge';
+  badge.textContent = 'Active';
+
+  button.append(icon, label, badge);
+  button.addEventListener('click', () => autofillPage(cred));
+  return button;
+}
+
+function scheduleActiveLoginActionHide() {
+  if (activeLoginActionTimer || activeLoginActionHidden) return;
+  activeLoginActionTimer = setTimeout(() => {
+    activeLoginActionHidden = true;
+    activeLoginActionTimer = null;
+    renderCredentials();
+  }, ACTIVE_LOGIN_ACTION_MS);
 }
 
 function buildTree(creds) {
@@ -437,7 +552,7 @@ function renderNode(name, node) {
   const edit = document.createElement('button');
   edit.className = 'btn-icon folder-edit';
   edit.type = 'button';
-  edit.title = 'Rename folder';
+  edit.title = 'Rename Folder';
   edit.textContent = '✎';
 
   const header = document.createElement('div');
@@ -457,7 +572,7 @@ function renderNode(name, node) {
 
   edit.addEventListener('click', async e => {
     e.stopPropagation();
-    const nextPath = window.prompt('Rename folder path. Existing folders are merged automatically.', fullPath);
+    const nextPath = window.prompt('Rename Folder path. Existing folders are merged automatically.', fullPath);
     if (nextPath === null) return;
     try {
       const changed = await renameFolder(fullPath, nextPath);
@@ -491,6 +606,12 @@ function renderCredentials() {
   });
 
   list.innerHTML = '';
+  const activeCredential = activeLoginActionHidden ? null : getActiveLoginCredential(sorted);
+  if (activeCredential) {
+    list.appendChild(makeActiveLoginButton(activeCredential));
+    scheduleActiveLoginActionHide();
+  }
+
   const root = buildTree(sorted);
   for (const name of Object.keys(root.children).sort(byName)) list.appendChild(renderNode(name, root.children[name]));
   for (const cred of root.creds) list.appendChild(makeCard(cred));
@@ -772,13 +893,6 @@ async function autofillPage(cred) {
           await new Promise(r => setTimeout(r, 500));
           filled = passField.value === password;
 
-          console.log('[SenKey]', JSON.stringify({
-            filled, origType,
-            passVal: passField.value.substring(0, 3),
-            host: passHost?.tagName,
-            ng: !!window.ng,
-          }));
-
           if (!filled) {
             return { success: false, debug: `pass blank after all strategies (host=${passHost?.tagName ?? 'none'}, ng=${!!window.ng})` };
           }
@@ -828,30 +942,43 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   btn.textContent = editingCredential ? 'Updating…' : 'Saving…';
 
   try {
-    const res = await chrome.runtime.sendMessage({
-      type: 'SAVE_CREDENTIAL',
-      payload: { domain, username, password, loginUrl },
-    });
-    if (res.error) throw new Error(res.error);
-    if (loginUrl && res.id) await setLoginUrlOverride(res.id, canonicalLoginUrl(loginUrl));
-    if (!loginUrl && res.id) await removeLoginUrlOverride(res.id);
-    if (res.id) await setFolderAssignment(res.id, folder);
-    if (editingCredential && editingCredential.id && editingCredential.id !== res.id) {
+    const res = await saveCredentialRecord({ domain, username, password, loginUrl }, folder);
+    const savedId = getSavedCredentialId(res, domain, username);
+    if (!savedId) throw new Error('Server did not return a credential id');
+    if (loginUrl) await setLoginUrlOverride(savedId, canonicalLoginUrl(loginUrl));
+    else await removeLoginUrlOverride(savedId);
+    await setFolderAssignment(savedId, folder);
+    await setPendingFolderSync(savedId, folder);
+    const savedCredential = {
+      id: savedId,
+      domain,
+      username,
+      password,
+      loginUrl: canonicalLoginUrl(loginUrl),
+      folder: normalizeFolderPath(folder),
+    };
+    if (editingCredential && editingCredential.id && editingCredential.id !== savedId) {
       const delRes = await chrome.runtime.sendMessage({ type: 'DELETE_CREDENTIAL', id: editingCredential.id });
       if (delRes?.error) throw new Error(delRes.error);
       await removeLoginUrlOverride(editingCredential.id);
       await removeFolderAssignment(editingCredential.id);
+      await clearPendingFolderSync(editingCredential.id);
     }
+    allCredentials = allCredentials
+      .filter(cred => cred.id !== savedCredential.id && cred.id !== editingCredential?.id)
+      .concat(savedCredential);
+    updateUsernameSuggestions();
+    updateFolderSuggestions();
+    renderCredentials();
     showToast(editingCredential ? '✓ Credential updated' : '✓ Saved to server', 'ok');
     resetCredentialForm();
-    await loadCredentials();
     document.querySelector('[data-tab="autofill"]').click();
   } catch (err) {
     showToast(err.message, 'err');
   } finally {
     btn.disabled = false;
     cancelBtn.disabled = false;
-    btn.textContent = editingCredential ? 'Update Credential' : 'Save to Server';
+    btn.textContent = editingCredential ? 'Update Credential' : 'Save To Server';
   }
 });
 
@@ -893,7 +1020,7 @@ async function loadAuthState() {
 document.getElementById('signInBtn').addEventListener('click', async () => {
   const btn = document.getElementById('signInBtn');
   btn.disabled = true;
-  btn.querySelector('svg').nextSibling.textContent = ' Signing in…';
+  btn.querySelector('svg').nextSibling.textContent = ' Signing In…';
   showAuthError();
   try {
     const res = await chrome.runtime.sendMessage({ type: 'GOOGLE_SIGN_IN' });
@@ -907,7 +1034,7 @@ document.getElementById('signInBtn').addEventListener('click', async () => {
     showToast('Google sign-in failed', 'err');
   } finally {
     btn.disabled = false;
-    btn.querySelector('svg').nextSibling.textContent = ' Sign in with Google';
+    btn.querySelector('svg').nextSibling.textContent = ' Sign In With Google';
   }
 });
 
@@ -956,10 +1083,13 @@ document.getElementById('importKeyFile').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// ---- Bookmark export / import ----
-const bookmarksApi = chrome.bookmarks;
+// ---- Login page import / export ----
+const loginPageBrowserApi = chrome.bookmarks;
+let loginPageDirty = false;
+let loginPageAutosaveTimer = null;
+let suppressLoginPageDirty = false;
 
-function bookmarkCall(fn, ...args) {
+function loginPageBrowserCall(fn, ...args) {
   return new Promise((resolve, reject) => {
     fn(...args, result => {
       if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
@@ -968,82 +1098,179 @@ function bookmarkCall(fn, ...args) {
   });
 }
 
-async function getBookmarkImportParentId() {
-  const tree = await bookmarkCall(bookmarksApi.getTree.bind(bookmarksApi));
+function normalizeLoginPageNode(node) {
+  const title = (node.title || node.name || '').trim();
+  if (node.url) return { title: title || node.url, url: node.url };
+  return {
+    title: title || 'Untitled',
+    children: (node.children || []).map(normalizeLoginPageNode),
+  };
+}
+
+function normalizeLoginPageRoots(data) {
+  if (data?.senkeyLoginPages && Array.isArray(data.roots)) return data.roots.map(normalizeLoginPageNode);
+  if (Array.isArray(data?.roots)) return data.roots.map(normalizeLoginPageNode);
+  if (Array.isArray(data) && data[0]?.children) return data[0].children.map(normalizeLoginPageNode);
+  if (Array.isArray(data)) return data.map(normalizeLoginPageNode);
+  if (data?.roots && typeof data.roots === 'object') {
+    const roots = ['bookmark_bar', 'other', 'synced']
+      .map(key => data.roots[key])
+      .filter(node => node?.children);
+    if (roots.length) return roots.map(normalizeLoginPageNode);
+  }
+  if (data && typeof data === 'object') {
+    const sample = Object.values(data).find(value => value && typeof value === 'object');
+    if (sample?.domain || sample?.username || sample?.password || sample?.loginUrl) {
+      throw new Error('That is a credentials file, not a login pages backup');
+    }
+  }
+  throw new Error('Invalid login pages file');
+}
+
+async function getCurrentLoginPageRoots() {
+  const roots = await loginPageBrowserCall(loginPageBrowserApi.getTree.bind(loginPageBrowserApi));
+  return (roots?.[0]?.children || roots || []).map(normalizeLoginPageNode);
+}
+
+async function saveLoginPagesToBucket(roots) {
+  clearTimeout(loginPageAutosaveTimer);
+  const res = await chrome.runtime.sendMessage({
+    type: 'SAVE_LOGINPAGES',
+    payload: { roots },
+  });
+  if (res?.error) throw new Error(res.error);
+  loginPageDirty = false;
+  return res;
+}
+
+async function getLoginPageImportParentId() {
+  const tree = await loginPageBrowserCall(loginPageBrowserApi.getTree.bind(loginPageBrowserApi));
   const rootChildren = tree?.[0]?.children || [];
   const bookmarksBar = rootChildren.find(node => /bookmarks bar/i.test(node.title || ''));
   return (bookmarksBar || rootChildren[0])?.id;
 }
 
-function normalizeBookmarkRoots(data) {
-  if (data?.senkeyBookmarks && Array.isArray(data.roots)) return data.roots;
-  if (Array.isArray(data) && data[0]?.children) return data[0].children;
-  if (data && typeof data === 'object') {
-    const sample = Object.values(data).find(value => value && typeof value === 'object');
-    if (sample?.domain || sample?.username || sample?.password || sample?.loginUrl) {
-      throw new Error('That is a credentials file, not a bookmarks backup');
-    }
-  }
-  throw new Error('Invalid bookmarks file');
-}
-
-async function importBookmarkNode(node, parentId) {
+async function importLoginPageNode(node, parentId) {
   if (!node || !parentId) return;
-  const title = (node.title || 'Untitled').trim() || 'Untitled';
+  const title = (node.title || node.name || 'Untitled').trim() || 'Untitled';
   if (node.url) {
-    await bookmarkCall(bookmarksApi.create.bind(bookmarksApi), { parentId, title, url: node.url });
+    await loginPageBrowserCall(loginPageBrowserApi.create.bind(loginPageBrowserApi), { parentId, title, url: node.url });
     return;
   }
 
-  const folder = await bookmarkCall(bookmarksApi.create.bind(bookmarksApi), { parentId, title });
+  const folder = await loginPageBrowserCall(loginPageBrowserApi.create.bind(loginPageBrowserApi), { parentId, title });
   for (const child of node.children || []) {
-    await importBookmarkNode(child, folder.id);
+    await importLoginPageNode(child, folder.id);
   }
 }
 
-document.getElementById('exportBookmarksBtn').addEventListener('click', async () => {
-  try {
-    const roots = await bookmarkCall(bookmarksApi.getTree.bind(bookmarksApi));
-    const data = {
-      senkeyBookmarks: true,
-      exportedAt: new Date().toISOString(),
-      roots: roots?.[0]?.children || roots,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const stamp = new Date().toISOString().slice(0, 10);
-    a.href = url;
-    a.download = `senkey-bookmarks-${stamp}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Bookmarks exported', 'ok');
-  } catch (err) {
-    showToast(err.message || 'Could not export bookmarks', 'err');
-  }
-});
+function downloadLoginPageFile(roots) {
+  const data = {
+    senkeyLoginPages: true,
+    exportedAt: new Date().toISOString(),
+    roots,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `senkey-login-pages-${stamp}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-document.getElementById('importBookmarksFile').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const roots = normalizeBookmarkRoots(JSON.parse(await file.text()));
-    const parentId = await getBookmarkImportParentId();
-    if (!parentId) throw new Error('Could not find bookmarks bar');
+async function restoreLoginPageRoots(roots) {
+  const parentId = await getLoginPageImportParentId();
+  if (!parentId) throw new Error('Could not find a browser folder for import');
 
-    const importedFolder = await bookmarkCall(bookmarksApi.create.bind(bookmarksApi), {
+  suppressLoginPageDirty = true;
+  try {
+    const importedFolder = await loginPageBrowserCall(loginPageBrowserApi.create.bind(loginPageBrowserApi), {
       parentId,
       title: `SenKey Import ${new Date().toLocaleString()}`,
     });
     for (const root of roots) {
-      await importBookmarkNode(root, importedFolder.id);
+      await importLoginPageNode(root, importedFolder.id);
     }
-    showToast('✓ Bookmarks imported', 'ok');
+  } finally {
+    setTimeout(() => { suppressLoginPageDirty = false; loginPageDirty = false; }, 0);
+  }
+}
+
+document.getElementById('exportLoginPagesBtn').addEventListener('click', async () => {
+  try {
+    const roots = await getCurrentLoginPageRoots();
+    downloadLoginPageFile(roots);
+    try {
+      await saveLoginPagesToBucket(roots);
+      showToast('Login Pages exported', 'ok');
+    } catch (err) {
+      showToast(`Downloaded backup. Bucket save failed: ${err.message}`, 'err');
+    }
   } catch (err) {
-    showToast(err.message || 'Invalid bookmarks file', 'err');
+    showToast(err.message || 'Could not export login pages', 'err');
+  }
+});
+
+document.getElementById('importLoginPagesFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const roots = normalizeLoginPageRoots(JSON.parse(await file.text()));
+    await saveLoginPagesToBucket(roots);
+    await restoreLoginPageRoots(roots);
+    showToast('✓ Login Pages imported', 'ok');
+  } catch (err) {
+    showToast(err.message || 'Invalid login pages file', 'err');
   }
   e.target.value = '';
 });
+
+function markLoginPagesDirty() {
+  if (suppressLoginPageDirty) return;
+  loginPageDirty = true;
+  clearTimeout(loginPageAutosaveTimer);
+  loginPageAutosaveTimer = setTimeout(saveDirtyLoginPages, 2000);
+}
+
+function saveDirtyLoginPages() {
+  clearTimeout(loginPageAutosaveTimer);
+  if (!loginPageDirty) return;
+  loginPageDirty = false;
+  getCurrentLoginPageRoots()
+    .then(saveLoginPagesToBucket)
+    .catch(err => {
+      loginPageDirty = true;
+      console.warn('[SenKey] failed to autosave login pages', err);
+    });
+}
+
+function registerLoginPageAutosave() {
+  loginPageBrowserApi.onCreated?.addListener(markLoginPagesDirty);
+  loginPageBrowserApi.onRemoved?.addListener(markLoginPagesDirty);
+  loginPageBrowserApi.onChanged?.addListener(markLoginPagesDirty);
+  loginPageBrowserApi.onMoved?.addListener(markLoginPagesDirty);
+  loginPageBrowserApi.onChildrenReordered?.addListener(markLoginPagesDirty);
+  loginPageBrowserApi.onImportEnded?.addListener(markLoginPagesDirty);
+
+  window.addEventListener('pagehide', saveDirtyLoginPages);
+  window.addEventListener('beforeunload', saveDirtyLoginPages);
+}
+
+if (loginPageBrowserApi) registerLoginPageAutosave();
+
+async function syncLoginPagesFromBucket() {
+  try {
+    const res = await chrome.runtime.sendMessage({ type: 'FETCH_LOGINPAGES' });
+    if (res?.error) return;
+    const roots = res.loginpages?.roots || res.bookmarks?.roots || [];
+    if (!roots.length) {
+      const currentRoots = await getCurrentLoginPageRoots();
+      await saveLoginPagesToBucket(currentRoots);
+    }
+  } catch {}
+}
 
 // ---- Settings ----
 async function loadSettings() {
@@ -1063,6 +1290,7 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
   await chrome.storage.local.set({ serverUrl, apiKey });
   showToast('✓ Settings saved', 'ok');
   await loadCredentials();
+  await syncLoginPagesFromBucket();
 });
 
 document.getElementById('openHelpBtn').addEventListener('click', async () => {
@@ -1093,8 +1321,10 @@ function escHtml(str) {
   document.getElementById('versionBadge').textContent = 'v' + chrome.runtime.getManifest().version;
   await loadSettings();
   currentDomain = await getCurrentDomain();
+  currentPageUrl = canonicalLoginUrl(await getCurrentPageUrl());
   document.getElementById('currentDomain').textContent = currentDomain || 'unknown site';
   await loadCredentials();
+  await syncLoginPagesFromBucket();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   await syncMatchingCredentialsForPage(tab?.id);
 })();

@@ -149,7 +149,7 @@
       <ol>
         <li>Click the SenKey icon in your browser toolbar.</li>
         <li>Open <code>⚙</code>.</li>
-        <li>In <code>Google Account</code>, click <code>Sign in with Google</code>.</li>
+        <li>In <code>Google Account</code>, click <code>Sign In With Google</code>.</li>
         <li>Complete the Google sign-in window.</li>
         <li>In <code>Server Configuration</code>, enter your <code>API URL</code>.</li>
         <li>Enter your <code>API Key</code>.</li>
@@ -193,6 +193,7 @@
 
       <h3>Fill a credential</h3>
       <p>Click the card or the <code>▶</code> button. SenKey will fill the current login page or open the saved login page and fill there.</p>
+      <p>When the current tab is already a saved login page, SenKey briefly shows an <code>Active</code> fill button at the top of the credential list.</p>
 
       <h3>Edit a credential</h3>
       <p>Click <code>✎</code>. SenKey opens the credential in the <code>Add</code> tab with the current values prefilled.</p>
@@ -202,6 +203,7 @@
 
       <h3>Folders</h3>
       <p>Credentials can be grouped into folders. Folders appear above ungrouped credentials and can be collapsed or expanded — SenKey remembers the open/closed state between sessions. Nested folders use <code>/</code> as a separator (e.g. <code>Work/Clients</code>).</p>
+      <p>Folder paths are saved with your credentials in the SenKey bucket, so they follow the signed-in Google user across browsers.</p>
       <p>Click <code>✎</code> on a folder header to rename that folder path. Renaming to an existing folder path automatically merges the credentials into that folder.</p>
     </section>
 
@@ -224,7 +226,7 @@
         <li>Enter your username or email.</li>
         <li>Enter your password.</li>
         <li>Optionally keep or change <code>Login URL</code>.</li>
-        <li>Click <code>Save to Server</code>.</li>
+        <li>Click <code>Save To Server</code>.</li>
       </ol>
 
       <h3>Update an existing credential</h3>
@@ -242,7 +244,7 @@
     <section class="section">
       <h2>Settings tab</h2>
       <h3>Google Account</h3>
-      <p>If you are signed out, you will see <code>Sign in with Google</code>. If you are signed in, you will see your profile initial, your name, your email, and a <code>✕</code> sign-out button.</p>
+      <p>If you are signed out, you will see <code>Sign In With Google</code>. If you are signed in, you will see your profile initial, your name, your email, and a <code>✕</code> sign-out button.</p>
       <p>In Brave, enable <code>brave://settings/extensions</code> &gt; <code>Allow Google login for extensions</code>, then sign into Google in a normal Brave tab before signing into SenKey.</p>
       <p>If you are testing an unpacked custom build, run <code>./build.sh</code> and load <code>dist/</code>. The OAuth client IDs in <code>.env</code> must match that installed extension ID.</p>
 
@@ -257,9 +259,10 @@
         SenKey uses these keys to decrypt your saved passwords. If they are lost and your browser storage is gone, you may not be able to recover your saved passwords. Anyone with this key file may be able to read the passwords protected by it.
       </div>
 
-      <h3>Bookmarks</h3>
-      <p>Use <code>Export Bookmarks</code> to download a JSON backup of all browser bookmarks.</p>
-      <p>Use <code>Import Bookmarks</code> to restore a bookmark JSON backup into a new folder on the bookmarks bar. Existing bookmarks are not deleted or overwritten.</p>
+      <h3>Login Pages</h3>
+      <p>Use <code>Export Login Pages</code> to download a JSON backup of the browser login page list. SenKey also tries to save the same backup to the bucket document that stores your credentials and credential folder paths. If the bucket save fails, the local JSON download still completes and SenKey shows the bucket error.</p>
+      <p>Use <code>Import Login Pages</code> to restore a login page JSON backup into a new browser folder and replace the bucket login page backup. Existing login pages are not deleted or overwritten.</p>
+      <p>If login pages change while the popup is open, SenKey saves the updated login page list to the bucket automatically and tries one last save when the popup closes.</p>
     </section>
 
     <section class="section">
@@ -278,8 +281,8 @@
           <code>Deleted</code><br>
           <code>Signed out</code><br>
           <code>Keys exported</code><br>
-          <code>Bookmarks exported</code><br>
-          <code>✓ Bookmarks imported</code><br>
+          <code>Login Pages exported</code><br>
+          <code>✓ Login Pages imported</code><br>
           <code>Updated saved login URL</code>
         </div>
       </div>
@@ -299,17 +302,6 @@
     <p class="footer">You can reopen this page any time from the popup header with <code>Help</code>.</p>
   </main>
 
-  <script>
-    const params = new URLSearchParams(location.search);
-    const reason = params.get("reason");
-    const note = document.getElementById("installNote");
-    if (reason === "install") {
-      note.textContent = "Welcome to SenKey. Complete the setup steps below before trying to save or fill credentials.";
-    } else if (reason === "update") {
-      note.textContent = "SenKey was updated. This page is a quick refresher on setup and daily use.";
-    } else if (reason === "help") {
-      note.textContent = "You opened this page from the SenKey Help button. Use it any time you want a quick refresher.";
-    }
-  </script>
+  <script src="manual.js"></script>
 </body>
 </html>
