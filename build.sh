@@ -134,6 +134,17 @@ with open("extension/oauth_config.js", "w") as f:
 PYEOF
 
 if [ "${1}" = "prod" ]; then
+  rm -f senkey.zip
+  if python3 - <<'PYEOF'
+import json
+with open("dist/manifest.json") as f:
+    raise SystemExit(0 if "key" in json.load(f) else 1)
+PYEOF
+  then
+    echo "❌  Production manifest contains a key field."
+    echo "    Run ./build.sh prod again after clearing EXTENSION_KEY and dev keys."
+    exit 1
+  fi
   (cd dist && zip -r ../senkey.zip . -x "*.DS_Store")
   echo "✅  Production build: senkey.zip  (ready for Web Store upload)"
 else
