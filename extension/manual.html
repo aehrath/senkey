@@ -75,6 +75,11 @@
     p { margin: 10px 0; }
     ol, ul { margin: 10px 0 0 22px; padding: 0; }
     li { margin: 6px 0; }
+    a {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    a:hover { color: #0b5f59; }
     code {
       background: rgba(109, 101, 87, 0.1);
       border-radius: 6px;
@@ -98,6 +103,27 @@
     .section {
       padding: 22px 24px;
       margin-bottom: 18px;
+    }
+    .toc-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 8px 14px;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .toc-list li { margin: 0; }
+    .toc-list a {
+      display: block;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: white;
+      text-decoration: none;
+    }
+    .toc-list a:hover {
+      background: rgba(15, 118, 110, 0.06);
+      border-color: rgba(15, 118, 110, 0.28);
     }
     .grid {
       display: grid;
@@ -144,7 +170,21 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="contents">
+      <h2>Contents</h2>
+      <ul class="toc-list">
+        <li><a href="#initial-setup">Initial setup</a></li>
+        <li><a href="#popup-overview">Popup overview</a></li>
+        <li><a href="#fill-tab">Fill tab</a></li>
+        <li><a href="#add-tab">Add tab</a></li>
+        <li><a href="#settings-tab">Settings tab</a></li>
+        <li><a href="#system-administrators">For system administrators</a></li>
+        <li><a href="#messages">Messages you may see</a></li>
+        <li><a href="#daily-use">Typical daily use</a></li>
+      </ul>
+    </section>
+
+    <section class="section" id="initial-setup">
       <h2>Initial setup</h2>
       <ol>
         <li>Click the SenKey icon in your browser toolbar.</li>
@@ -158,7 +198,7 @@
       <p>After this is done, SenKey is ready to fetch, save, and fill your credentials.</p>
     </section>
 
-    <section class="section">
+    <section class="section" id="popup-overview">
       <h2>Popup overview</h2>
       <div class="grid">
         <div class="tile">
@@ -180,7 +220,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="fill-tab">
       <h2>Fill tab</h2>
       <p>The <code>Fill</code> tab lists your saved credentials. Each credential card shows:</p>
       <ul>
@@ -207,7 +247,7 @@
       <p>Click <code>✎</code> on a folder header to rename that folder path. Renaming to an existing folder path automatically merges the credentials into that folder.</p>
     </section>
 
-    <section class="section">
+    <section class="section" id="add-tab">
       <h2>Add tab</h2>
       <p>Use the <code>Add</code> tab to save a new credential or update an existing one.</p>
       <p>Visible fields:</p>
@@ -241,7 +281,7 @@
       <p>Click the <code>👁</code> button next to the password field to show or hide the password.</p>
     </section>
 
-    <section class="section">
+    <section class="section" id="settings-tab">
       <h2>Settings tab</h2>
       <h3>Google Account</h3>
       <p>If you are signed out, you will see <code>Sign In With Google</code>. If you are signed in, you will see your profile initial, your name, your email, and a <code>✕</code> sign-out button.</p>
@@ -265,7 +305,14 @@
       <p>If login pages change while the popup is open, SenKey saves the updated login page list to the bucket automatically and tries one last save when the popup closes.</p>
     </section>
 
-    <section class="section">
+    <section class="section" id="system-administrators">
+      <h2>For system administrators</h2>
+      <p>SenKey needs a deployed backend before users can fetch, save, or sync credentials. The backend-only deployment zip is available here: <a href="https://drive.google.com/file/d/1JP2zc87otL8IQrM8A0HCQ4mAjK5GF95S/view?usp=drive_link" target="_blank" rel="noopener noreferrer">senkey-deploy.zip</a>.</p>
+      <p>Deploy the backend, then give users the deployed <code>API URL</code> and <code>API Key</code> for the extension Settings tab.</p>
+      <p>If the extension does not work after sign-in and settings are saved, ask your system administrator to deploy or check the SenKey backend.</p>
+    </section>
+
+    <section class="section" id="messages">
       <h2>Messages you may see</h2>
       <div class="grid">
         <div class="tile">
@@ -288,7 +335,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="daily-use">
       <h2>Typical daily use</h2>
       <ol>
         <li>Open the site you want to sign in to.</li>
