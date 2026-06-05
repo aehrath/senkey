@@ -7,6 +7,21 @@ try {
 }
 
 const pendingAutofills = new Map();
+const CREDENTIAL_CACHE_KEY = 'credentialCache';
+const CREDENTIAL_CACHE_USER_KEY = 'credentialCacheUser';
+const CREDENTIAL_CACHE_UPDATED_AT_KEY = 'credentialCacheUpdatedAt';
+
+function storageGet(keys) {
+  return new Promise(resolve => chrome.storage.local.get(keys, resolve));
+}
+
+function storageSet(values) {
+  return new Promise(resolve => chrome.storage.local.set(values, resolve));
+}
+
+function storageRemove(keys) {
+  return new Promise(resolve => chrome.storage.local.remove(keys, resolve));
+}
 
 chrome.runtime.onInstalled.addListener(details => {
   if (!details?.reason) return;
@@ -17,7 +32,7 @@ chrome.runtime.onInstalled.addListener(details => {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'FETCH_CREDENTIALS') {
-    handleFetch().then(sendResponse).catch(err => sendResponse({ error: err.message }));
+    handleFetch({ preferCache: !!msg.preferCache }).then(sendResponse).catch(err => sendResponse({ error: err.message }));
     return true;
   }
   if (msg.type === 'SAVE_CREDENTIAL') {
@@ -39,6 +54,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'RESET_KEYS') {
     _keyPair = null;
     sendResponse({ success: true });
+    return true;
+  }
+  if (msg.type === 'CLEAR_CREDENTIAL_CACHE') {
+    clearCredentialCache().then(() => sendResponse({ success: true })).catch(err => sendResponse({ error: err.message }));
     return true;
   }
   if (msg.type === 'GOOGLE_SIGN_IN') {
@@ -85,9 +104,7 @@ function base64ToBuffer(b64) {
 async function getOrCreateKeyPair() {
   if (_keyPair) return _keyPair;
 
-  const stored = await new Promise(resolve =>
-    chrome.storage.local.get(['publicKey', 'privateKey'], resolve)
-  );
+  const stored = await storageGet(['publicKey', 'privateKey']);
 
   if (stored.publicKey && stored.privateKey) {
     const publicKey = await crypto.subtle.importKey(
@@ -108,10 +125,10 @@ async function getOrCreateKeyPair() {
     );
     const pub  = await crypto.subtle.exportKey('spki',  _keyPair.publicKey);
     const priv = await crypto.subtle.exportKey('pkcs8', _keyPair.privateKey);
-    await new Promise(resolve => chrome.storage.local.set({
+    await storageSet({
       publicKey:  bufferToBase64(pub),
       privateKey: bufferToBase64(priv),
-    }, resolve));
+    });
   }
 
   return _keyPair;
@@ -144,12 +161,12 @@ async function decryptPassword(value) {
 // ---- Config / auth ----
 
 async function getConfig() {
-  return new Promise(resolve => chrome.storage.local.get(['serverUrl', 'apiKey'], resolve));
+  return storageGet(['serverUrl', 'apiKey']);
 }
 
 async function getGoogleToken() {
   const { googleAccessToken, googleAccessTokenExpiresAt } =
-    await chrome.storage.local.get(['googleAccessToken', 'googleAccessTokenExpiresAt']);
+    await storageGet(['googleAccessToken', 'googleAccessTokenExpiresAt']);
   if (googleAccessToken && googleAccessTokenExpiresAt && Date.now() < googleAccessTokenExpiresAt - 60000) {
     return googleAccessToken;
   }
@@ -161,7 +178,7 @@ async function getGoogleToken() {
   });
   if (token) return token;
 
-  await chrome.storage.local.remove(['googleAccessToken', 'googleAccessTokenExpiresAt']);
+  await storageRemove(['googleAccessToken', 'googleAccessTokenExpiresAt']);
   return null;
 }
 
@@ -299,7 +316,7 @@ async function getTokenWithWebAuthFlow() {
   const token = params.get('access_token');
   if (!token) throw new Error('Google did not return an access token.');
   const expiresIn = Number(params.get('expires_in') || 3600);
-  await chrome.storage.local.set({
+  await storageSet({
     googleAccessToken: token,
     googleAccessTokenExpiresAt: Date.now() + Math.max(60, expiresIn) * 1000,
   });
@@ -320,19 +337,110 @@ async function makeHeaders(includeContentType = false) {
 
 // ---- API handlers ----
 
-async function handleFetch() {
+async function getCredentialCacheUser() {
+  const { googleUser } = await storageGet(['googleUser']);
+  return googleUser?.email || '';
+}
+
+async function readCredentialCache() {
+  const userEmail = await getCredentialCacheUser();
+  if (!userEmail) return null;
+
+  const data = await storageGet([
+    CREDENTIAL_CACHE_KEY,
+    CREDENTIAL_CACHE_USER_KEY,
+    CREDENTIAL_CACHE_UPDATED_AT_KEY,
+  ]);
+  const cache = data[CREDENTIAL_CACHE_KEY];
+  if (data[CREDENTIAL_CACHE_USER_KEY] !== userEmail || !Array.isArray(cache?.credentials)) {
+    return null;
+  }
+
+  return {
+    credentials: cache.credentials,
+    updatedAt: data[CREDENTIAL_CACHE_UPDATED_AT_KEY] || cache.updatedAt || 0,
+  };
+}
+
+async function writeCredentialCache(credentials) {
+  const userEmail = await getCredentialCacheUser();
+  if (!userEmail) return;
+
+  const updatedAt = Date.now();
+  await storageSet({
+    [CREDENTIAL_CACHE_KEY]: { credentials, updatedAt },
+    [CREDENTIAL_CACHE_USER_KEY]: userEmail,
+    [CREDENTIAL_CACHE_UPDATED_AT_KEY]: updatedAt,
+  });
+}
+
+async function clearCredentialCache() {
+  await storageRemove([
+    CREDENTIAL_CACHE_KEY,
+    CREDENTIAL_CACHE_USER_KEY,
+    CREDENTIAL_CACHE_UPDATED_AT_KEY,
+  ]);
+}
+
+async function decryptCredentialRows(rows) {
+  return Promise.all(
+    (rows || []).map(async cred => ({
+      ...cred,
+      password: await decryptPassword(cred.password),
+    }))
+  );
+}
+
+async function credentialResponseFromRows(rows, meta = {}) {
+  return {
+    credentials: await decryptCredentialRows(rows),
+    ...meta,
+  };
+}
+
+async function upsertCredentialCache(row) {
+  if (!row?.id) return;
+
+  const cache = await readCredentialCache();
+  if (!cache) return;
+
+  const credentials = cache.credentials
+    .filter(cred => cred.id !== row.id)
+    .concat(row);
+  await writeCredentialCache(credentials);
+}
+
+async function removeCredentialFromCache(id) {
+  if (!id) return;
+
+  const cache = await readCredentialCache();
+  if (!cache) return;
+
+  await writeCredentialCache(cache.credentials.filter(cred => cred.id !== id));
+}
+
+async function handleFetch({ preferCache = false } = {}) {
+  if (preferCache) {
+    const cache = await readCredentialCache();
+    if (cache) {
+      return credentialResponseFromRows(cache.credentials, {
+        fromCache: true,
+        cachedAt: cache.updatedAt,
+      });
+    }
+  }
+
   const { serverUrl } = await getConfig();
   if (!serverUrl) throw new Error('Server URL not configured. Open Settings.');
   const res = await fetch(serverUrl, { headers: await makeHeaders() });
   if (!res.ok) throw new Error(await getServerErrorMessage(res));
   const data = await res.json();
-  const credentials = await Promise.all(
-    (data.credentials || []).map(async cred => ({
-      ...cred,
-      password: await decryptPassword(cred.password),
-    }))
-  );
-  return { credentials };
+  const rawCredentials = data.credentials || [];
+  await writeCredentialCache(rawCredentials);
+  return credentialResponseFromRows(rawCredentials, {
+    fromCache: false,
+    cachedAt: Date.now(),
+  });
 }
 
 async function handleSave(payload) {
@@ -345,7 +453,13 @@ async function handleSave(payload) {
     body: JSON.stringify(encrypted),
   });
   if (!res.ok) throw new Error(await getServerErrorMessage(res));
-  return res.json();
+  const result = await res.json();
+  await upsertCredentialCache({
+    ...encrypted,
+    id: result.id || payload.id,
+    updated: new Date().toISOString(),
+  });
+  return result;
 }
 
 async function getServerErrorMessage(res) {
@@ -396,7 +510,9 @@ async function handleDelete(id) {
     body: JSON.stringify({ id }),
   });
   if (!res.ok) throw new Error(await getServerErrorMessage(res));
-  return res.json();
+  const result = await res.json();
+  await removeCredentialFromCache(id);
+  return result;
 }
 
 async function googleSignIn() {
@@ -416,7 +532,9 @@ async function googleSignIn() {
   });
   if (!res.ok) throw new Error('Failed to fetch user info from Google');
   const info = await res.json();
-  await chrome.storage.local.set({
+  const { googleUser } = await storageGet(['googleUser']);
+  if (googleUser?.email && googleUser.email !== info.email) await clearCredentialCache();
+  await storageSet({
     googleUser: { email: info.email, name: info.name, picture: info.picture },
   });
   return { email: info.email, name: info.name };
@@ -428,7 +546,8 @@ async function googleSignOut() {
     await new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
   }
   await new Promise(resolve => chrome.identity.clearAllCachedAuthTokens(resolve));
-  await chrome.storage.local.remove(['googleUser', 'googleAccessToken', 'googleAccessTokenExpiresAt']);
+  await storageRemove(['googleUser', 'googleAccessToken', 'googleAccessTokenExpiresAt']);
+  await clearCredentialCache();
   return { success: true };
 }
 

@@ -113,6 +113,8 @@ if key:
 if build_mode != "prod" and key:
     m["key"] = key
     print(f"🔐  Dev extension ID: {actual_extension_id}")
+elif build_mode == "prod":
+    m.pop("key", None)
 
 with open("dist/manifest.json", "w") as f:
     json.dump(m, f, indent=2)

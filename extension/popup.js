@@ -15,6 +15,9 @@ const SPECIAL_LOGIN_URLS = {
 };
 const PENDING_FOLDER_SYNCS_KEY = 'pendingFolderSyncs';
 const ACTIVE_LOGIN_ACTION_MS = 6000;
+const LOGIN_PAGES_CLOUD_CHECKED_AT_KEY = 'loginPagesCloudCheckedAt';
+const LOGIN_PAGES_CLOUD_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+let credentialsRefreshInFlight = null;
 
 const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
@@ -200,6 +203,10 @@ function showToast(msg, type = 'ok') {
   setTimeout(() => t.className = 'toast', 2500);
 }
 
+function closeAfterLoginPlayback() {
+  window.close();
+}
+
 function showAuthError(message = '') {
   const el = document.getElementById('authError');
   if (!el) return;
@@ -381,12 +388,19 @@ async function syncMatchingCredentialsForPage(tabId) {
 }
 
 // ---- Load credentials from server ----
-async function loadCredentials() {
+async function loadCredentials({
+  preferCache = false,
+  refreshAfterCache = false,
+  showLoading = true,
+  showErrors = true,
+} = {}) {
   const list = document.getElementById('credList');
-  list.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Fetching from server…</div>';
+  if (showLoading) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Fetching from server…</div>';
+  }
 
   try {
-    const res = await chrome.runtime.sendMessage({ type: 'FETCH_CREDENTIALS' });
+    const res = await chrome.runtime.sendMessage({ type: 'FETCH_CREDENTIALS', preferCache });
     if (res.error) throw new Error(res.error);
     const overrides = await getLoginUrlOverrides();
     const pendingFolderSyncs = await getPendingFolderSyncs();
@@ -412,10 +426,27 @@ async function loadCredentials() {
     updateFolderSuggestions();
     renderCredentials();
     void retryPendingFolderSyncs();
+    if (res.fromCache && refreshAfterCache) void refreshCredentialsFromServer();
   } catch (err) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
+    if (showErrors) {
+      list.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
+    } else {
+      console.warn('[SenKey] background credential refresh failed', err);
+    }
     updateUsernameSuggestions();
   }
+}
+
+function refreshCredentialsFromServer() {
+  if (credentialsRefreshInFlight) return credentialsRefreshInFlight;
+  credentialsRefreshInFlight = loadCredentials({
+    preferCache: false,
+    showLoading: false,
+    showErrors: false,
+  }).finally(() => {
+    credentialsRefreshInFlight = null;
+  });
+  return credentialsRefreshInFlight;
 }
 
 async function retryPendingFolderSyncs() {
@@ -638,7 +669,7 @@ async function autofillPage(cred) {
     });
     if (res?.error) throw new Error(res.error);
     showToast(`Opening and filling ${normalizeDomain(url)}`, 'ok');
-    setTimeout(() => window.close(), 400);
+    closeAfterLoginPlayback();
     return;
   }
 
@@ -656,7 +687,7 @@ async function autofillPage(cred) {
       });
       if (res?.error) throw new Error(res.error);
       showToast(`Opening and filling ${normalizeDomain(url)}`, 'ok');
-      setTimeout(() => window.close(), 400);
+      closeAfterLoginPlayback();
       return;
     }
   }
@@ -911,7 +942,7 @@ async function autofillPage(cred) {
 
   if (results?.some(r => r.result?.success)) {
     showToast('✓ Filled!', 'ok');
-    setTimeout(() => window.close(), 800);
+    closeAfterLoginPlayback();
   } else {
     const frames = results?.length ?? 0;
     const debugMsgs = results?.map(r => r.result?.debug).filter(Boolean) ?? [];
@@ -1017,6 +1048,11 @@ async function loadAuthState() {
   }
 }
 
+async function clearCredentialCache() {
+  const res = await chrome.runtime.sendMessage({ type: 'CLEAR_CREDENTIAL_CACHE' });
+  if (res?.error) throw new Error(res.error);
+}
+
 document.getElementById('signInBtn').addEventListener('click', async () => {
   const btn = document.getElementById('signInBtn');
   btn.disabled = true;
@@ -1045,7 +1081,9 @@ document.getElementById('signOutBtn').addEventListener('click', async () => {
     showToast('Signed out', 'ok');
     await loadAuthState();
     allCredentials = [];
+    folderAssignments = {};
     updateUsernameSuggestions();
+    updateFolderSuggestions();
     renderCredentials();
   } catch (err) {
     showToast(err.message, 'err');
@@ -1075,6 +1113,7 @@ document.getElementById('importKeyFile').addEventListener('change', async e => {
     if (!data.senkey || !data.publicKey || !data.privateKey) throw new Error('Invalid key file');
     await chrome.storage.local.set({ publicKey: data.publicKey, privateKey: data.privateKey });
     await chrome.runtime.sendMessage({ type: 'RESET_KEYS' });
+    await clearCredentialCache();
     showToast('✓ Keys imported', 'ok');
     await loadCredentials();
   } catch (err) {
@@ -1139,6 +1178,7 @@ async function saveLoginPagesToBucket(roots) {
     payload: { roots },
   });
   if (res?.error) throw new Error(res.error);
+  await markLoginPagesCloudChecked();
   loginPageDirty = false;
   return res;
 }
@@ -1260,16 +1300,36 @@ function registerLoginPageAutosave() {
 
 if (loginPageBrowserApi) registerLoginPageAutosave();
 
-async function syncLoginPagesFromBucket() {
+async function markLoginPagesCloudChecked() {
+  await chrome.storage.local.set({ [LOGIN_PAGES_CLOUD_CHECKED_AT_KEY]: Date.now() });
+}
+
+async function shouldSyncLoginPagesFromBucket(force = false) {
+  if (force) return true;
+  const data = await chrome.storage.local.get(LOGIN_PAGES_CLOUD_CHECKED_AT_KEY);
+  const checkedAt = Number(data[LOGIN_PAGES_CLOUD_CHECKED_AT_KEY] || 0);
+  return !checkedAt || Date.now() - checkedAt > LOGIN_PAGES_CLOUD_CHECK_INTERVAL_MS;
+}
+
+async function syncLoginPagesFromBucket({ force = false } = {}) {
+  if (!(await shouldSyncLoginPagesFromBucket(force))) return;
+
   try {
     const res = await chrome.runtime.sendMessage({ type: 'FETCH_LOGINPAGES' });
-    if (res?.error) return;
+    if (res?.error) {
+      await markLoginPagesCloudChecked();
+      return;
+    }
+    await markLoginPagesCloudChecked();
     const roots = res.loginpages?.roots || res.bookmarks?.roots || [];
     if (!roots.length) {
       const currentRoots = await getCurrentLoginPageRoots();
       await saveLoginPagesToBucket(currentRoots);
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[SenKey] login pages cloud check failed', err);
+    await markLoginPagesCloudChecked();
+  }
 }
 
 // ---- Settings ----
@@ -1288,9 +1348,10 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
   try { new URL(serverUrl); } catch { return showToast('Invalid server URL', 'err'); }
 
   await chrome.storage.local.set({ serverUrl, apiKey });
+  await clearCredentialCache();
   showToast('✓ Settings saved', 'ok');
   await loadCredentials();
-  await syncLoginPagesFromBucket();
+  await syncLoginPagesFromBucket({ force: true });
 });
 
 document.getElementById('openHelpBtn').addEventListener('click', async () => {
@@ -1323,7 +1384,7 @@ function escHtml(str) {
   currentDomain = await getCurrentDomain();
   currentPageUrl = canonicalLoginUrl(await getCurrentPageUrl());
   document.getElementById('currentDomain').textContent = currentDomain || 'unknown site';
-  await loadCredentials();
+  await loadCredentials({ preferCache: true, refreshAfterCache: true });
   await syncLoginPagesFromBucket();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   await syncMatchingCredentialsForPage(tab?.id);
