@@ -318,9 +318,29 @@ function urlLooksLikeLoginPage(url) {
   }
 }
 
+function isLoginUrlDowngrade(previousUrl, nextUrl) {
+  const previous = canonicalLoginUrl(previousUrl);
+  const next = canonicalLoginUrl(nextUrl);
+  if (!previous || !next) return false;
+
+  if (urlLooksLikeLoginPage(previous) && !urlLooksLikeLoginPage(next)) return true;
+
+  try {
+    const previousParsed = new URL(previous);
+    const nextParsed = new URL(next);
+    const sameHost = previousParsed.hostname === nextParsed.hostname;
+    const previousHasPath = previousParsed.pathname && previousParsed.pathname !== '/';
+    const nextIsRoot = (!nextParsed.pathname || nextParsed.pathname === '/') && !nextParsed.search;
+    return sameHost && previousHasPath && nextIsRoot;
+  } catch {
+    return false;
+  }
+}
+
 async function syncCredentialLoginUrl(cred, nextUrl) {
   const loginUrl = canonicalLoginUrl(nextUrl);
   if (!loginUrl || canonicalLoginUrl(cred.loginUrl) === loginUrl) return false;
+  if (isLoginUrlDowngrade(cred.loginUrl, loginUrl)) return false;
 
   await saveCredentialRecord({ ...cred, loginUrl }, folderAssignments[cred.id] || cred.folder || '');
 
@@ -675,8 +695,10 @@ async function autofillPage(cred) {
 
   const onLoginPage = await pageLooksLikeLoginPage(tab.id);
   const loginLikeUrl = urlLooksLikeLoginPage(currentUrl);
-  if (!onLoginPage) {
-    const url = getCredentialUrl(cred);
+  const savedUrl = getCredentialUrl(cred);
+  const savedUrlLooksLikeLoginPage = urlLooksLikeLoginPage(savedUrl);
+  if (!onLoginPage || (savedUrlLooksLikeLoginPage && !loginLikeUrl)) {
+    const url = savedUrl;
     if (url && canonicalLoginUrl(url) !== currentUrl) {
       const res = await chrome.runtime.sendMessage({
         type: 'NAVIGATE_AND_AUTOFILL',

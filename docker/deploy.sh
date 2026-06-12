@@ -7,7 +7,13 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-ACTIVE_ACCOUNT="$(gcloud config get-value account 2>/dev/null || true)"
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "❌  Required command not found: $1"
+    exit 1
+  fi
+}
 
 ENV_FILE="${SCRIPT_DIR}/.env"
 if [ ! -f "$ENV_FILE" ]; then
@@ -21,15 +27,47 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
+require_command gcloud
+require_command openssl
+require_command python3
+
+ACTIVE_ACCOUNT="$(gcloud config get-value account 2>/dev/null || true)"
+
 source "$ENV_FILE"
 GENERATED_API_KEY="false"
 REGION="${REGION:-us-west1}"
 SERVICE_NAME="senkey-api"
 REPOSITORY_NAME="senkey"
-CHROME_EXTENSION_ID="${CHROME_EXTENSION_ID:-gcmgfpkabdjhniklindbjieohnfngchg}"
+PUBLISHED_CHROME_EXTENSION_ID="gcmgfpkabdjhniklindbjieohnfngchg"
+PUBLISHED_GOOGLE_OAUTH_CLIENT_IDS="456135155814-6vbckdu5beemnfbajrehs6l5diehhaim.apps.googleusercontent.com,456135155814-src93bcdntarmoohu8bl2d97jjdfldn9.apps.googleusercontent.com"
+CHROME_EXTENSION_ID="${CHROME_EXTENSION_ID:-$PUBLISHED_CHROME_EXTENSION_ID}"
+CLOUD_RUN_ENV_FILE=""
+
+cleanup() {
+  if [ -n "$CLOUD_RUN_ENV_FILE" ] && [ -f "$CLOUD_RUN_ENV_FILE" ]; then
+    rm -f "$CLOUD_RUN_ENV_FILE"
+  fi
+}
+
+trap cleanup EXIT
 
 generate_api_key() {
   openssl rand -hex 32
+}
+
+collect_google_oauth_client_ids() {
+  local raw="${GOOGLE_OAUTH_CLIENT_IDS:-},${GOOGLE_OAUTH_CLIENT_ID:-},${DEV_GOOGLE_OAUTH_CLIENT_ID:-},${WEB_GOOGLE_OAUTH_CLIENT_ID:-}"
+  local collected
+  collected="$(printf '%s' "$raw" \
+    | tr ',' '\n' \
+    | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+    | awk '/^[^[:space:]]+\.apps\.googleusercontent\.com$/ && !seen[$0]++' \
+    | paste -sd, -)"
+  if [ -n "$collected" ]; then
+    printf '%s' "$collected"
+  elif [ "$CHROME_EXTENSION_ID" = "$PUBLISHED_CHROME_EXTENSION_ID" ]; then
+    printf '%s' "$PUBLISHED_GOOGLE_OAUTH_CLIENT_IDS"
+  fi
 }
 
 ensure_bucket() {
@@ -91,6 +129,29 @@ path.write_text(text)
 PY
 }
 
+write_cloud_run_env_file() {
+  local path="$1"
+  export API_KEY BUCKET_NAME GOOGLE_OAUTH_CLIENT_IDS
+  python3 - "$path" <<'PY'
+from pathlib import Path
+import json
+import os
+import sys
+
+items = {
+    "API_KEY": os.environ["API_KEY"],
+    "GCS_BUCKET": os.environ["BUCKET_NAME"],
+}
+
+oauth_ids = os.environ.get("GOOGLE_OAUTH_CLIENT_IDS", "")
+if oauth_ids:
+    items["GOOGLE_OAUTH_CLIENT_IDS"] = oauth_ids
+
+path = Path(sys.argv[1])
+path.write_text("".join(f"{key}: {json.dumps(value)}\n" for key, value in items.items()))
+PY
+}
+
 if [ -z "$PROJECT_ID" ]; then
   echo "❌  PROJECT_ID is not set in $ENV_FILE"
   exit 1
@@ -114,6 +175,8 @@ if [ -z "$API_KEY" ]; then
   persist_env_value "API_KEY" "$API_KEY"
 fi
 
+GOOGLE_OAUTH_CLIENT_IDS="$(collect_google_oauth_client_ids)"
+
 echo "🔎  Verifying project exists..."
 if ! gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
   echo "❌  Google Cloud project was not found: $PROJECT_ID"
@@ -132,6 +195,11 @@ echo "Source  : $SCRIPT_DIR"
 echo "Image   : $IMAGE"
 echo "Bucket  : $BUCKET_NAME"
 echo "Ext ID  : $CHROME_EXTENSION_ID"
+if [ -n "$GOOGLE_OAUTH_CLIENT_IDS" ]; then
+  echo "OAuth   : restricted to configured Google OAuth client IDs"
+else
+  echo "OAuth   : no client ID allow-list configured"
+fi
 if [ "$GENERATED_API_KEY" = "true" ]; then
   echo "API Key : generated and saved to $ENV_FILE"
 fi
@@ -144,9 +212,6 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   storage.googleapis.com \
   --project="$PROJECT_ID"
-
-echo "🎯  Setting active project..."
-gcloud config set project "$PROJECT_ID"
 
 ensure_bucket
 ensure_artifact_repository
@@ -177,12 +242,15 @@ if ! gcloud builds submit "$SCRIPT_DIR" \
 fi
 
 echo "📦  Deploying image to Cloud Run..."
+CLOUD_RUN_ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/senkey-cloudrun-env.XXXXXX")"
+write_cloud_run_env_file "$CLOUD_RUN_ENV_FILE"
+
 if ! gcloud run deploy "$SERVICE_NAME" \
   --image "$IMAGE" \
   --region "$REGION" \
   --platform managed \
   --allow-unauthenticated \
-  --set-env-vars "API_KEY=${API_KEY},GCS_BUCKET=${BUCKET_NAME},CHROME_EXTENSION_ID=${CHROME_EXTENSION_ID}" \
+  --env-vars-file "$CLOUD_RUN_ENV_FILE" \
   --memory 128Mi \
   --cpu 1 \
   --max-instances 5 \
@@ -211,6 +279,9 @@ echo "  API URL  :  ${SERVICE_URL}"
 echo "  API Key  :  ${API_KEY}"
 echo "  Ext ID   :  ${CHROME_EXTENSION_ID}"
 echo "  Bucket   :  ${BUCKET_NAME}"
+if [ -n "$GOOGLE_OAUTH_CLIENT_IDS" ]; then
+  echo "  OAuth IDs:  ${GOOGLE_OAUTH_CLIENT_IDS}"
+fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 if [ "$GENERATED_API_KEY" = "true" ]; then

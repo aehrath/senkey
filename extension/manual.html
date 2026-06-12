@@ -286,7 +286,8 @@
       <h3>Google Account</h3>
       <p>If you are signed out, you will see <code>Sign In With Google</code>. If you are signed in, you will see your profile initial, your name, your email, and a <code>✕</code> sign-out button.</p>
       <p>In Brave, enable <code>brave://settings/extensions</code> &gt; <code>Allow Google login for extensions</code>, then sign into Google in a normal Brave tab before signing into SenKey.</p>
-      <p>If you are testing an unpacked custom build, run <code>./build.sh</code> and load <code>dist/</code>. The OAuth client IDs in <code>.env</code> must match that installed extension ID.</p>
+      <p>If you are testing an unpacked custom build, run <code>./build.sh</code> and load <code>dist/</code>. Dev builds show a <code>DEV</code> badge on the extension logo so they are easy to tell apart from the published build. The OAuth client IDs in <code>.env</code> must match that installed extension ID.</p>
+      <p>If Google shows <code>redirect_uri_mismatch</code>, the Web application OAuth client used for Brave fallback is missing the exact <code>https://&lt;extension-id&gt;.chromiumapp.org/oauth2</code> redirect URI, or the extension was built with the wrong OAuth client type.</p>
 
       <h3>Server Configuration</h3>
       <p>Enter <code>API URL</code> and <code>API Key</code>, then click <code>Save Settings</code>.</p>
@@ -309,6 +310,7 @@
       <h2>For system administrators</h2>
       <p>SenKey needs a deployed backend before users can fetch, save, or sync credentials. The backend-only deployment zip is available here: <a href="https://drive.google.com/file/d/1JP2zc87otL8IQrM8A0HCQ4mAjK5GF95S/view?usp=drive_link" target="_blank" rel="noopener noreferrer">senkey-deploy.zip</a>.</p>
       <p>Deploy the backend, then give users the deployed <code>API URL</code> and <code>API Key</code> for the extension Settings tab.</p>
+      <p>For custom extension builds, use a Chrome Extension OAuth client for <code>GOOGLE_OAUTH_CLIENT_ID</code> and a separate Web application OAuth client for <code>WEB_GOOGLE_OAUTH_CLIENT_ID</code>. Do not reuse the Chrome Extension client as the Web client.</p>
       <p>If the extension does not work after sign-in and settings are saved, ask your system administrator to deploy or check the SenKey backend.</p>
     </section>
 

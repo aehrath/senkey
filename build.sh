@@ -2,7 +2,7 @@
 # Builds the extension by merging manifest.json with values from .env
 #
 # Usage:
-#   ./build.sh        — dev build (includes a stable manifest key)
+#   ./build.sh        — dev build (includes a stable manifest key and DEV icon badge)
 #   ./build.sh prod   — Web Store upload build (outputs senkey.zip without a manifest key)
 #
 # Setup:
@@ -43,11 +43,48 @@ if [ -z "$CHROME_EXTENSION_ID" ]; then
   exit 1
 fi
 
+validate_google_client_id() {
+  local name="$1"
+  local value="$2"
+  if [ -z "$value" ]; then
+    return
+  fi
+  case "$value" in
+    *.apps.googleusercontent.com) ;;
+    *)
+      echo "❌  ${name} must be a Google OAuth client ID ending in .apps.googleusercontent.com"
+      exit 1
+      ;;
+  esac
+}
+
+validate_google_client_id "GOOGLE_OAUTH_CLIENT_ID" "$GOOGLE_OAUTH_CLIENT_ID"
+validate_google_client_id "WEB_GOOGLE_OAUTH_CLIENT_ID" "${WEB_GOOGLE_OAUTH_CLIENT_ID:-}"
+
+if [ -n "${WEB_GOOGLE_OAUTH_CLIENT_ID:-}" ] && [ "$WEB_GOOGLE_OAUTH_CLIENT_ID" = "$GOOGLE_OAUTH_CLIENT_ID" ]; then
+  echo "❌  WEB_GOOGLE_OAUTH_CLIENT_ID cannot equal GOOGLE_OAUTH_CLIENT_ID."
+  echo "    WEB_GOOGLE_OAUTH_CLIENT_ID must be a Web application OAuth client, not a Chrome Extension OAuth client."
+  echo "    Add this authorized redirect URI to that Web client:"
+  echo "    https://${CHROME_EXTENSION_ID}.chromiumapp.org/oauth2"
+  exit 1
+fi
+
+if [ "$BUILD_MODE" = "prod" ] && [ -z "${WEB_GOOGLE_OAUTH_CLIENT_ID:-}" ]; then
+  echo "⚠️  WEB_GOOGLE_OAUTH_CLIENT_ID is blank."
+  echo "    Chrome/Edge sign-in can still use GOOGLE_OAUTH_CLIENT_ID."
+  echo "    Brave fallback sign-in needs a Web application OAuth client with:"
+  echo "    https://${CHROME_EXTENSION_ID}.chromiumapp.org/oauth2"
+fi
+
 rm -rf dist
 mkdir -p dist
 
 cp extension/popup.html extension/popup.js extension/background.js extension/content.js extension/manual.html extension/manual.js extension/oauth_config.js dist/
 cp -r extension/icons dist/
+
+if [ "$BUILD_MODE" != "prod" ]; then
+  python3 tools/mark_dev_icons.py dist/icons/icon16.png dist/icons/icon48.png dist/icons/icon128.png
+fi
 
 if [ -z "${EXTENSION_KEY:-}" ]; then
   if [ -f extension.pem ]; then
@@ -168,7 +205,7 @@ else
   echo "  API URL : (not deployed yet — run ./deploy.sh)"
 fi
 if [ -n "${API_KEY:-}" ]; then
-  echo "  API Key : $API_KEY"
+  echo "  API Key : set in .env"
 else
   echo "  API Key : (not set — run ./deploy.sh to generate one)"
 fi

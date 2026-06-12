@@ -9,11 +9,12 @@
  * Environment variables (set via deploy.sh / Cloud Run console):
  *   API_KEY     → shared secret distributed to your users
  *   GCS_BUCKET  → your GCS bucket name (created by deploy.sh)
- *   CHROME_EXTENSION_ID → fixed SenKey Chrome Web Store extension ID, useful for OAuth setup reference
+ *   GOOGLE_OAUTH_CLIENT_IDS → optional comma-separated OAuth client IDs allowed to call this backend
  */
 
-$apiKey    = getenv('API_KEY')    ?: 'CHANGE_ME';
-$gcsBucket = getenv('GCS_BUCKET') ?: '';
+$apiKey               = getenv('API_KEY')    ?: '';
+$gcsBucket            = getenv('GCS_BUCKET') ?: '';
+$googleOAuthClientIds = parseCsv(getenv('GOOGLE_OAUTH_CLIENT_IDS') ?: '');
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -25,7 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Server-level access gate
-if (($_SERVER['HTTP_X_API_KEY'] ?? '') !== $apiKey) {
+if (!$apiKey || $apiKey === 'CHANGE_ME') {
+    http_response_code(500);
+    echo json_encode(['error' => 'API_KEY env var not set']); exit;
+}
+
+if (!hash_equals($apiKey, $_SERVER['HTTP_X_API_KEY'] ?? '')) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']); exit;
 }
@@ -36,6 +42,22 @@ if (!$gcsBucket) {
 }
 
 // ---- GCS helpers ----
+function parseCsv(string $value): array {
+    $parts = array_map('trim', explode(',', $value));
+    return array_values(array_filter(array_unique($parts)));
+}
+
+function fetchJson(string $url, array $headers = [], int $timeout = 5): array {
+    $ctx = stream_context_create(['http' => [
+        'header'        => implode("\r\n", $headers) . (count($headers) ? "\r\n" : ''),
+        'ignore_errors' => true,
+        'timeout'       => $timeout,
+    ]]);
+    $body = @file_get_contents($url, false, $ctx);
+    if (!$body) return [];
+    return json_decode($body, true) ?? [];
+}
+
 function getServiceAccountToken(): string {
     $ctx = stream_context_create(['http' => [
         'header'  => "Metadata-Flavor: Google\r\n",
@@ -114,21 +136,32 @@ function normalizeLoginPageRootsPayload(array $body): array {
 }
 
 // ---- Verify user's Google token and return their stable sub ----
-function verifyGoogleToken(string $token): string {
-    $ctx = stream_context_create(['http' => [
-        'header'        => "Authorization: Bearer {$token}\r\n",
-        'ignore_errors' => true,
-        'timeout'       => 5,
-    ]]);
-    $body = @file_get_contents('https://www.googleapis.com/oauth2/v3/userinfo', false, $ctx);
-    if (!$body) {
+function verifyGoogleToken(string $token, array $allowedClientIds): string {
+    $info = fetchJson(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        ["Authorization: Bearer {$token}"]
+    );
+    if (!$info) {
         http_response_code(401);
         echo json_encode(['error' => 'Could not verify Google token']); exit;
     }
-    $info = json_decode($body, true) ?? [];
     if (empty($info['sub'])) {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid Google token']); exit;
+    }
+    if ($allowedClientIds) {
+        $tokenInfo = fetchJson('https://oauth2.googleapis.com/tokeninfo?access_token=' . rawurlencode($token));
+        $audiences = array_filter([
+            $tokenInfo['aud'] ?? '',
+            $tokenInfo['azp'] ?? '',
+            $tokenInfo['audience'] ?? '',
+            $tokenInfo['issued_to'] ?? '',
+            $tokenInfo['client_id'] ?? '',
+        ]);
+        if (!array_intersect($allowedClientIds, $audiences)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Google token audience is not allowed']); exit;
+        }
     }
     return $info['sub'];
 }
@@ -139,7 +172,7 @@ if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
     echo json_encode(['error' => 'Google sign-in required']); exit;
 }
 
-$userId    = verifyGoogleToken($m[1]);
+$userId    = verifyGoogleToken($m[1], $googleOAuthClientIds);
 $gcsObject = 'credentials/' . preg_replace('/[^a-z0-9]/i', '', $userId) . '.json';
 
 // ---- Route ----

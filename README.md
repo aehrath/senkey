@@ -60,9 +60,9 @@ cp .env.example .env
 2. Fill in:
 
 - `PROJECT_ID`
-- `REGION`
-- `CHROME_EXTENSION_ID` only if you are not using the published extension ID
+- `REGION` if you do not want the default `us-west1`
 - `API_KEY`, or leave it blank so `./deploy.sh` generates one automatically
+- `CHROME_EXTENSION_ID` only for custom extension builds
 
 3. Deploy the Cloud Run backend:
 
@@ -98,20 +98,21 @@ What the deploy script does:
 - creates or reuses the storage bucket `${PROJECT_ID}-senkey`
 - creates or reuses the Artifact Registry repository `senkey`
 - builds the backend image with Cloud Build
-- sets `API_KEY`, `GCS_BUCKET`, and `CHROME_EXTENSION_ID` on Cloud Run
+- sets `API_KEY`, `GCS_BUCKET`, and the Google OAuth client allow-list on Cloud
+  Run
 - prints the final service URL and API key
 
-SenKey no longer uses Cloud Run source deploys, so new deploys should not create
-or recreate a `run-sources...` bucket. If an older deploy already created one,
-you can delete that bucket after confirming no deploy is currently running.
-SenKey stores user data only in `${PROJECT_ID}-senkey`.
+SenKey builds and deploys a container image instead of using Cloud Run source
+deploys. User data is stored only in `${PROJECT_ID}-senkey`.
 
 What you set manually in `.env`:
 
 - `PROJECT_ID`
-- `REGION`
-- `CHROME_EXTENSION_ID`
+- `REGION` if you do not want the default
+- `CHROME_EXTENSION_ID` only for custom extension builds
 - `API_KEY` if you want to choose your own shared key
+- `GOOGLE_OAUTH_CLIENT_IDS` only if you want to override the backend's
+  accepted Google OAuth client IDs
 
 What is automatic:
 
@@ -120,6 +121,9 @@ What is automatic:
 - Artifact Registry repository creation
 - API enablement
 - `API_KEY` generation if the field is blank
+- `GOOGLE_OAUTH_CLIENT_IDS`: the deploy script uses the published SenKey OAuth
+  IDs for the published extension, or derives the allow-list from the custom
+  OAuth client IDs in `.env`
 
 You do not need to add `GCS_BUCKET` manually to `.env`.
 
@@ -151,6 +155,17 @@ the backend `API URL` and `API Key` into SenKey settings.
 
 Create OAuth clients only when you build, fork, or load your own copy of the
 extension.
+
+### OAuth Client Types
+
+SenKey can use two Google OAuth client types. They are not interchangeable.
+
+- `GOOGLE_OAUTH_CLIENT_ID` / `DEV_GOOGLE_OAUTH_CLIENT_ID`
+  Must be a `Chrome extension` / `Chrome App` OAuth client. Its Chrome App /
+  Item ID must exactly match the installed extension ID.
+- `WEB_GOOGLE_OAUTH_CLIENT_ID`
+  Must be a separate `Web application` OAuth client. Use it only for Brave's
+  `launchWebAuthFlow` fallback.
 
 ### Custom Chrome or Edge Build
 
@@ -186,6 +201,10 @@ https://<extension-id>.chromiumapp.org/oauth2
 WEB_GOOGLE_OAUTH_CLIENT_ID=...
 ```
 
+Do not reuse `GOOGLE_OAUTH_CLIENT_ID` here. `GOOGLE_OAUTH_CLIENT_ID` is a
+Chrome Extension OAuth client and has no redirect URI settings; the fallback
+requires a separate Web application OAuth client.
+
 4. Run `./build.sh` and reload the built `dist/` extension.
 
 ### OAuth Troubleshooting
@@ -198,6 +217,8 @@ WEB_GOOGLE_OAUTH_CLIENT_ID=...
 - The Brave fallback OAuth client must be application type `Web application`;
   its authorized redirect URI must be
   `https://<extension-id>.chromiumapp.org/oauth2`.
+  For the published extension ID in this repo, that URI is
+  `https://gcmgfpkabdjhniklindbjieohnfngchg.chromiumapp.org/oauth2`.
 - In Brave, enable `brave://settings/extensions` > `Allow Google login for
   extensions`, and sign into Google in a normal Brave tab.
 - After changing `GOOGLE_OAUTH_CLIENT_ID`, `DEV_GOOGLE_OAUTH_CLIENT_ID`, or
@@ -205,6 +226,17 @@ WEB_GOOGLE_OAUTH_CLIENT_ID=...
 
 Google's downloaded `client_secret_*.json` file is not used by this extension.
 Only the generated OAuth client IDs belong in `.env`.
+
+### Backend OAuth Allow-List
+
+The backend always requires both `X-API-Key` and a Google Bearer token. The
+deploy script also sets a Google token audience allow-list. You usually do not
+need to fill in `GOOGLE_OAUTH_CLIENT_IDS`: for the published extension, deploy
+uses SenKey's published OAuth clients; for custom full-repo builds, deploy
+derives the allow-list from `GOOGLE_OAUTH_CLIENT_ID`,
+`DEV_GOOGLE_OAUTH_CLIENT_ID`, and `WEB_GOOGLE_OAUTH_CLIENT_ID`. Set
+`GOOGLE_OAUTH_CLIENT_IDS` only when you need to override that backend allow-list
+manually, such as in a backend-only custom deployment.
 
 ## Build Commands
 
@@ -224,10 +256,11 @@ What they do:
 - `./build.sh`
   Creates `dist/` for unpacked local testing. Dev builds include a stable
   manifest key from `EXTENSION_KEY`, an existing PEM key, or generated
-  `extension.dev.pem`.
+  `extension.dev.pem`, and the generated icons include a `DEV` badge so the
+  unpacked extension is visually distinct.
 - `./build.sh prod`
   Creates `senkey.zip` for Chrome Web Store upload. Production builds do not
-  include a manifest key.
+  include a manifest key or the dev icon badge.
 - `./deploy.sh`
   Deploys the Cloud Run backend from the repo root.
 - `./package-deploy.sh`

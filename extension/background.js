@@ -10,6 +10,7 @@ const pendingAutofills = new Map();
 const CREDENTIAL_CACHE_KEY = 'credentialCache';
 const CREDENTIAL_CACHE_USER_KEY = 'credentialCacheUser';
 const CREDENTIAL_CACHE_UPDATED_AT_KEY = 'credentialCacheUpdatedAt';
+const CHROME_IDENTITY_SIGN_IN_TIMEOUT_MS = 120000;
 
 function storageGet(keys) {
   return new Promise(resolve => chrome.storage.local.get(keys, resolve));
@@ -190,6 +191,8 @@ function getGoogleAuthErrorMessage(message) {
     `OAuth client: ${diagnostics.oauthClientId}`,
     `Redirect URI: ${diagnostics.redirectUri}`,
     `Web OAuth client: ${diagnostics.webOAuthClientId}`,
+    `If Google shows redirect_uri_mismatch, add this exact redirect URI to the Web application OAuth client: ${diagnostics.redirectUri}`,
+    'WEB_GOOGLE_OAUTH_CLIENT_ID must be a Web application OAuth client ID, not the Chrome Extension OAuth client ID from the manifest.',
     'In Brave, open brave://settings/extensions, enable "Allow Google login for extensions", sign into Google in a normal Brave tab, reload SenKey, and try again.',
     'For Brave fallback, create a Google OAuth Web application client and set WEB_GOOGLE_OAUTH_CLIENT_ID in .env.',
     'For unpacked builds, load the dist/ folder created by ./build.sh so the extension ID matches the Google OAuth client.',
@@ -267,7 +270,7 @@ async function getTokenWithChromeIdentity(interactive) {
       settled = true;
       void closeNewGoogleAuthTabs(existingGoogleAuthTabIds);
       reject(new Error('Chrome identity sign-in did not finish.'));
-    }, interactive ? 2000 : 1000);
+    }, interactive ? CHROME_IDENTITY_SIGN_IN_TIMEOUT_MS : 1000);
 
     chrome.identity.getAuthToken({ interactive }, token => {
       if (settled) return;
@@ -287,6 +290,9 @@ async function getTokenWithWebAuthFlow() {
   const webOAuthClientId = self.SENKEY_WEB_GOOGLE_OAUTH_CLIENT_ID || '';
   if (!webOAuthClientId) {
     throw new Error('Brave web auth fallback is missing WEB_GOOGLE_OAUTH_CLIENT_ID.');
+  }
+  if (webOAuthClientId === manifest.oauth2?.client_id) {
+    throw new Error('WEB_GOOGLE_OAUTH_CLIENT_ID is set to the Chrome Extension OAuth client. Create a Web application OAuth client instead.');
   }
 
   const redirectUri = chrome.identity.getRedirectURL('oauth2');

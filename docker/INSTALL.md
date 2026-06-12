@@ -21,11 +21,12 @@ cp .env.example .env
 Fill in:
 
 - `PROJECT_ID`
-- `REGION`
-- `CHROME_EXTENSION_ID` only if you are not using the published extension ID
+- `REGION` if you do not want the default `us-west1`
 - `API_KEY`, or leave it blank for automatic generation
+- `CHROME_EXTENSION_ID` only for custom extension builds
+- `GOOGLE_OAUTH_CLIENT_IDS` only for backend-only custom extension deployments
 
-For the published SenKey extension:
+The default published SenKey extension ID is:
 
 ```text
 CHROME_EXTENSION_ID=gcmgfpkabdjhniklindbjieohnfngchg
@@ -50,14 +51,12 @@ The deploy script:
 - deploys that image to Cloud Run
 - sets `API_KEY`
 - sets `GCS_BUCKET`
-- sets `CHROME_EXTENSION_ID`
+- sets `GOOGLE_OAUTH_CLIENT_IDS`
 
 If `API_KEY` is blank, the script generates one and writes it back into `.env`.
 
-SenKey no longer uses Cloud Run source deploys, so new deploys should not create
-or recreate a `run-sources...` bucket. If an older deploy already created one,
-you can delete that bucket after confirming no deploy is currently running.
-SenKey stores user data only in `${PROJECT_ID}-senkey`.
+SenKey builds and deploys a container image. User data is stored only in
+`${PROJECT_ID}-senkey`.
 
 ## 4. Configure the extension
 
@@ -74,9 +73,11 @@ When deploy finishes, copy the printed values into SenKey:
 
 - You do not need to add `GCS_BUCKET` to `.env`.
 - If you use the published SenKey extension unchanged, you do not need your own
-  Google OAuth client. The published extension already has one.
-- OAuth client IDs are used only when building your own extension. They are not
-  used by the backend API.
+  Google OAuth clients. The published extension and backend bundle already have
+  the matching client IDs.
+- `GOOGLE_OAUTH_CLIENT_ID` is for extension builds. `GOOGLE_OAUTH_CLIENT_IDS`
+  is only the backend token audience allow-list, and deploy fills it
+  automatically for the published extension.
 
 ## Troubleshooting
 
@@ -86,12 +87,16 @@ When deploy finishes, copy the printed values into SenKey:
   Brave, enable `brave://settings/extensions` > `Allow Google login for
   extensions`, then sign into Google in a normal Brave tab. For custom extension
   builds, confirm the OAuth clients in `.env` match the installed extension ID,
-  run `./build.sh`, and reload `dist/`.
+  run `./build.sh`, and reload `dist/`. A `redirect_uri_mismatch` error means
+  the Web application OAuth client is missing the exact
+  `https://<extension-id>.chromiumapp.org/oauth2` redirect URI.
 - `Unauthorized`
   Check that the extension `API Key` matches the deployed `API_KEY`.
 - `Google sign-in required`
   Check that the user is signed in through the extension. For custom extension
-  builds, also check the OAuth setup in the repo README.
+  builds, also check the OAuth setup in the repo README. If
+  `GOOGLE_OAUTH_CLIENT_IDS` is set, make sure it includes every OAuth client the
+  extension can use.
 - `GCS_BUCKET env var not set`
   Redeploy and confirm the latest Cloud Run revision is active.
 - `Server error 400` when exporting login pages

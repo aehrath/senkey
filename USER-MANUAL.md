@@ -168,7 +168,13 @@ login for extensions`, then sign into Google in a normal Brave tab before
 signing into SenKey.
 
 If you are testing an unpacked custom build, run `./build.sh` and load `dist/`.
-The OAuth client IDs in `.env` must match that installed extension ID.
+Dev builds show a `DEV` badge on the extension logo so they are easy to tell
+apart from the published build. The OAuth client IDs in `.env` must match that
+installed extension ID.
+If Google shows `redirect_uri_mismatch`, the Web application OAuth client used
+for Brave fallback is missing the exact
+`https://<extension-id>.chromiumapp.org/oauth2` redirect URI, or the extension
+was built with the wrong OAuth client type.
 
 #### Sign Out
 
