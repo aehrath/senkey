@@ -1,5 +1,7 @@
 # SenKey Cloud Run Backend
 
+Current version: `1.4.0`
+
 This folder contains the Google Cloud Run backend for SenKey.
 
 It is the server-side part of SenKey that:
@@ -135,6 +137,10 @@ When `GOOGLE_OAUTH_CLIENT_IDS` is blank, `deploy.sh` uses SenKey's published
 OAuth client IDs for the published extension ID. For backend-only custom
 extension deployments, set `GOOGLE_OAUTH_CLIENT_IDS` manually.
 
+After changing any extension OAuth client ID, redeploy the backend. Cloud Run
+receives `GOOGLE_OAUTH_CLIENT_IDS` at deploy time and does not pick up `.env`
+changes automatically.
+
 For custom extension builds, see the Google OAuth setup in
 [../README.md](../README.md). Chrome and Edge use a `Chrome extension` OAuth
 client. Brave may also need a separate `Web application` OAuth client for the
@@ -216,6 +222,13 @@ Check that:
 - Google sign-in is working in the extension
 - if `GOOGLE_OAUTH_CLIENT_IDS` is set, it includes the Chrome Extension OAuth
   client and any Web application fallback client used by the extension
+
+### `Google token audience is not allowed`
+
+The user is signed in, but the deployed backend does not allow the OAuth client
+ID that issued the token. Add the missing client ID to `GOOGLE_OAUTH_CLIENT_IDS`
+or the corresponding full-repo OAuth variable, redeploy the backend, then sign
+out and sign in again from the extension settings.
 
 ### `GCS_BUCKET env var not set`
 

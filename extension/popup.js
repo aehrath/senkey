@@ -18,6 +18,7 @@ const ACTIVE_LOGIN_ACTION_MS = 6000;
 const LOGIN_PAGES_CLOUD_CHECKED_AT_KEY = 'loginPagesCloudCheckedAt';
 const LOGIN_PAGES_CLOUD_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 let credentialsRefreshInFlight = null;
+const UINT32_RANGE = 0x100000000;
 const PASSWORD_SUGGESTION_LENGTH = 20;
 const PASSWORD_SUGGESTION_CHARSETS = [
   'ABCDEFGHJKLMNPQRSTUVWXYZ',
@@ -25,6 +26,7 @@ const PASSWORD_SUGGESTION_CHARSETS = [
   '23456789',
   '!@#$%^&*()-_=+[]{};:,.?',
 ];
+const PASSWORD_SUGGESTION_ALL_CHARS = PASSWORD_SUGGESTION_CHARSETS.join('');
 
 const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
@@ -202,20 +204,24 @@ function toggleVisibility(inputId, btn) {
 document.getElementById('togglePass').addEventListener('click', () => toggleVisibility('addPassword', document.getElementById('togglePass')));
 document.getElementById('toggleKey').addEventListener('click',  () => toggleVisibility('apiKey', document.getElementById('toggleKey')));
 
-function secureRandomIndex(max) {
-  const limit = 0x100000000 - (0x100000000 % max);
+function secureRandomIndex(maxExclusive) {
+  if (!Number.isInteger(maxExclusive) || maxExclusive < 1) {
+    throw new Error('Random range must be a positive integer');
+  }
+
+  const limit = UINT32_RANGE - (UINT32_RANGE % maxExclusive);
   const random = new Uint32Array(1);
   do {
     crypto.getRandomValues(random);
   } while (random[0] >= limit);
-  return random[0] % max;
+  return random[0] % maxExclusive;
 }
 
-function randomCharacter(chars) {
+function pickRandomCharacter(chars) {
   return chars[secureRandomIndex(chars.length)];
 }
 
-function shuffleCharacters(chars) {
+function shuffleInPlace(chars) {
   for (let i = chars.length - 1; i > 0; i -= 1) {
     const j = secureRandomIndex(i + 1);
     [chars[i], chars[j]] = [chars[j], chars[i]];
@@ -224,12 +230,12 @@ function shuffleCharacters(chars) {
 }
 
 function suggestSecurePassword(length = PASSWORD_SUGGESTION_LENGTH) {
-  const password = PASSWORD_SUGGESTION_CHARSETS.map(randomCharacter);
-  const allCharacters = PASSWORD_SUGGESTION_CHARSETS.join('');
-  while (password.length < length) {
-    password.push(randomCharacter(allCharacters));
+  const targetLength = Math.max(length, PASSWORD_SUGGESTION_CHARSETS.length);
+  const password = PASSWORD_SUGGESTION_CHARSETS.map(pickRandomCharacter);
+  while (password.length < targetLength) {
+    password.push(pickRandomCharacter(PASSWORD_SUGGESTION_ALL_CHARS));
   }
-  return shuffleCharacters(password).join('');
+  return shuffleInPlace(password).join('');
 }
 
 document.getElementById('suggestPass').addEventListener('click', () => {

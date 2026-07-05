@@ -1,5 +1,7 @@
 # SenKey Chrome Web Store Listing
 
+Current version: `1.4.0`
+
 Use the text below for the Chrome Web Store listing. It is written to match the current SenKey feature set and deployment model.
 
 ## Extension name

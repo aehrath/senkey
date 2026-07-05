@@ -1,5 +1,7 @@
 # SenKey Cloud Run Install Guide
 
+Current version: `1.4.0`
+
 Use this guide for the shortest possible checklist for deploying the SenKey backend to Google Cloud Run.
 
 ## Prerequisites
@@ -78,6 +80,8 @@ When deploy finishes, copy the printed values into SenKey:
 - `GOOGLE_OAUTH_CLIENT_ID` is for extension builds. `GOOGLE_OAUTH_CLIENT_IDS`
   is only the backend token audience allow-list, and deploy fills it
   automatically for the published extension.
+- After changing OAuth client IDs, redeploy the backend so Cloud Run receives
+  the updated allow-list.
 
 ## Troubleshooting
 
@@ -97,6 +101,10 @@ When deploy finishes, copy the printed values into SenKey:
   builds, also check the OAuth setup in the repo README. If
   `GOOGLE_OAUTH_CLIENT_IDS` is set, make sure it includes every OAuth client the
   extension can use.
+- `Google token audience is not allowed`
+  The backend allow-list is missing the OAuth client used by the installed
+  extension. Add the missing client ID, redeploy, then sign out and sign in
+  again from the extension settings.
 - `GCS_BUCKET env var not set`
   Redeploy and confirm the latest Cloud Run revision is active.
 - `Server error 400` when exporting login pages

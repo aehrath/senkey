@@ -1,5 +1,7 @@
 # SenKey User Manual
 
+Current version: `1.4.0`
+
 This guide explains how to use the installed SenKey extension using only the controls visible in the popup.
 
 ## Initial setup
@@ -142,7 +144,10 @@ Click the `👁` button next to the password field.
 
 ### Suggest a secure password
 
-Click the `↻` button next to the password field to fill a new secure password suggestion.
+Click the `↻` button next to the password field to fill a new 20-character
+password suggestion. The suggestion is generated locally in the extension. It
+is saved and encrypted only when you click `Save To Server` or
+`Update Credential`.
 
 ## Settings tab
 

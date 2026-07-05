@@ -353,6 +353,11 @@
   .suggest-pass { right: 33px; }
   .toggle-pass:hover,
   .suggest-pass:hover { color: var(--text2); }
+  .toggle-pass:focus-visible,
+  .suggest-pass:focus-visible {
+    outline: 1px solid var(--accent);
+    color: var(--text2);
+  }
 
   /* ---- Buttons ---- */
   .btn {
@@ -547,7 +552,7 @@
   <div class="form-group">
     <label>Password</label>
     <div class="pass-wrap has-suggestion">
-      <input type="password" id="addPassword" placeholder="••••••••">
+      <input type="password" id="addPassword" placeholder="••••••••" autocomplete="new-password">
       <button type="button" class="suggest-pass" id="suggestPass" title="Suggest secure password" aria-label="Suggest secure password">↻</button>
       <button type="button" class="toggle-pass" id="togglePass" title="Show or hide password" aria-label="Show or hide password">👁</button>
     </div>

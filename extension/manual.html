@@ -51,6 +51,10 @@
       color: var(--muted);
       text-transform: uppercase;
     }
+    .doc-version {
+      color: var(--accent);
+      font-weight: 700;
+    }
     .brand-icon {
       width: 40px;
       height: 40px;
@@ -162,6 +166,7 @@
       <div class="brand">
         <img class="brand-icon" src="icons/icon48.png" alt="SenKey logo">
         SenKey
+        <span class="doc-version">v1.4.0</span>
       </div>
       <h1>SenKey Help</h1>
       <p class="lede">This guide explains how to use SenKey using only the screens and controls visible in the extension popup.</p>
@@ -280,7 +285,7 @@
       <h3>Password visibility</h3>
       <p>Click the <code>👁</code> button next to the password field to show or hide the password.</p>
       <h3>Password suggestion</h3>
-      <p>Click the <code>↻</code> button next to the password field to fill a new secure password suggestion.</p>
+      <p>Click the <code>↻</code> button next to the password field to fill a new 20-character password suggestion. The suggestion is generated locally in the extension. It is saved and encrypted only when you click <code>Save To Server</code> or <code>Update Credential</code>.</p>
     </section>
 
     <section class="section" id="settings-tab">

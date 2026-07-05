@@ -1,5 +1,7 @@
 # SenKey
 
+Current version: `1.4.0`
+
 SenKey is a Chromium extension that stores and autofills credentials from your own backend instead of a third-party password manager.
 
 It is built around five ideas:
@@ -30,6 +32,7 @@ senkey/
 ├── build.sh            Extension build script
 ├── deploy.sh           Repo-root Cloud Run deploy wrapper
 ├── package-deploy.sh   Creates a backend-only shareable bundle
+├── CHANGELOG.md        Release history
 ├── USER-MANUAL.md      User-facing extension manual
 └── README.md
 ```
@@ -222,7 +225,8 @@ requires a separate Web application OAuth client.
 - In Brave, enable `brave://settings/extensions` > `Allow Google login for
   extensions`, and sign into Google in a normal Brave tab.
 - After changing `GOOGLE_OAUTH_CLIENT_ID`, `DEV_GOOGLE_OAUTH_CLIENT_ID`, or
-  `WEB_GOOGLE_OAUTH_CLIENT_ID`, run `./build.sh` and reload the extension.
+  `WEB_GOOGLE_OAUTH_CLIENT_ID`, run `./build.sh`, reload the extension, and
+  redeploy the backend so Cloud Run receives the updated OAuth allow-list.
 
 Google's downloaded `client_secret_*.json` file is not used by this extension.
 Only the generated OAuth client IDs belong in `.env`.
@@ -237,6 +241,11 @@ derives the allow-list from `GOOGLE_OAUTH_CLIENT_ID`,
 `DEV_GOOGLE_OAUTH_CLIENT_ID`, and `WEB_GOOGLE_OAUTH_CLIENT_ID`. Set
 `GOOGLE_OAUTH_CLIENT_IDS` only when you need to override that backend allow-list
 manually, such as in a backend-only custom deployment.
+
+If the extension shows `Server error 401: Google token audience is not allowed`,
+the signed-in extension is using an OAuth client ID that is missing from the
+deployed backend's allow-list. Add the missing client ID to `.env`, redeploy the
+backend, then sign out and sign in again from the extension settings.
 
 ## Build Commands
 
@@ -284,7 +293,7 @@ Daily use:
 - `Fill`
   Click a saved credential to fill the current login page or open the saved login page and fill there. Credentials are grouped by folder when folders are assigned.
 - `Add`
-  Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`. The password field can suggest a secure password.
+  Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`. The password field can fill a locally generated secure suggestion.
 - `Settings`
   Sign in, save backend settings, back up encryption keys, and import or export Login Pages.
 - `Help`
