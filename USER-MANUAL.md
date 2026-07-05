@@ -107,6 +107,7 @@ Visible buttons:
 - `Save To Server`
 - `Update Credential` while editing
 - `Cancel` while editing
+- `↻` next to the password field to suggest a secure password
 - `👁` next to the password field
 
 The `Folder` field groups the credential under a named folder in the `Fill` tab. Use `/` for nesting (for example, `Work/Clients`). Existing folder names are suggested as you type.
@@ -116,7 +117,7 @@ The `Folder` field groups the credential under a named folder in the `Fill` tab.
 1. Open `Add`.
 2. Enter the site in `Domain`.
 3. Enter your username or email.
-4. Enter your password.
+4. Enter your password, or click `↻` to suggest a secure password.
 5. Optionally keep or change `Login URL`.
 6. Click `Save To Server`.
 
@@ -138,6 +139,10 @@ If you opened a credential in update mode, click `Cancel` to leave edit mode.
 ### Show or hide the password
 
 Click the `👁` button next to the password field.
+
+### Suggest a secure password
+
+Click the `↻` button next to the password field to fill a new secure password suggestion.
 
 ## Settings tab
 
@@ -282,6 +287,7 @@ Common success messages:
 - `Signed out`
 - `Opening and filling …`
 - `Updated saved login URL`
+- `Secure password suggested`
 
 Common error messages:
 

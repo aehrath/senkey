@@ -328,20 +328,31 @@
 
   .pass-wrap { position: relative; }
   .pass-wrap input { padding-right: 36px; }
-  .toggle-pass {
+  .pass-wrap.has-suggestion input { padding-right: 68px; }
+  .toggle-pass,
+  .suggest-pass {
     position: absolute;
-    right: 9px; top: 50%;
+    top: 50%;
     transform: translateY(-50%);
     background: none;
     border: none;
     color: var(--muted);
     cursor: pointer;
     font-size: 13px;
-    padding: 2px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
     transition: color 0.15s;
   }
-  .toggle-pass:hover { color: var(--text2); }
+  .toggle-pass { right: 7px; }
+  .suggest-pass { right: 33px; }
+  .toggle-pass:hover,
+  .suggest-pass:hover { color: var(--text2); }
 
   /* ---- Buttons ---- */
   .btn {
@@ -535,9 +546,10 @@
   </div>
   <div class="form-group">
     <label>Password</label>
-    <div class="pass-wrap">
+    <div class="pass-wrap has-suggestion">
       <input type="password" id="addPassword" placeholder="••••••••">
-      <button class="toggle-pass" id="togglePass">👁</button>
+      <button type="button" class="suggest-pass" id="suggestPass" title="Suggest secure password" aria-label="Suggest secure password">↻</button>
+      <button type="button" class="toggle-pass" id="togglePass" title="Show or hide password" aria-label="Show or hide password">👁</button>
     </div>
   </div>
   <div class="form-group">
@@ -593,7 +605,7 @@
     <label>API Key</label>
     <div class="pass-wrap">
       <input type="password" id="apiKey" placeholder="Your secret API key">
-      <button class="toggle-pass" id="toggleKey">👁</button>
+      <button type="button" class="toggle-pass" id="toggleKey" title="Show or hide API key" aria-label="Show or hide API key">👁</button>
     </div>
   </div>
   <button class="btn btn-primary" id="saveSettings">Save Settings</button>

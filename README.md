@@ -284,7 +284,7 @@ Daily use:
 - `Fill`
   Click a saved credential to fill the current login page or open the saved login page and fill there. Credentials are grouped by folder when folders are assigned.
 - `Add`
-  Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`.
+  Save a new credential or update an existing one. Fields: `Domain`, `Username / Email`, `Password`, `Login URL`, and `Folder`. The password field can suggest a secure password.
 - `Settings`
   Sign in, save backend settings, back up encryption keys, and import or export Login Pages.
 - `Help`

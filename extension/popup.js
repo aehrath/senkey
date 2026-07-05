@@ -18,6 +18,13 @@ const ACTIVE_LOGIN_ACTION_MS = 6000;
 const LOGIN_PAGES_CLOUD_CHECKED_AT_KEY = 'loginPagesCloudCheckedAt';
 const LOGIN_PAGES_CLOUD_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 let credentialsRefreshInFlight = null;
+const PASSWORD_SUGGESTION_LENGTH = 20;
+const PASSWORD_SUGGESTION_CHARSETS = [
+  'ABCDEFGHJKLMNPQRSTUVWXYZ',
+  'abcdefghijkmnopqrstuvwxyz',
+  '23456789',
+  '!@#$%^&*()-_=+[]{};:,.?',
+];
 
 const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
@@ -194,6 +201,43 @@ function toggleVisibility(inputId, btn) {
 }
 document.getElementById('togglePass').addEventListener('click', () => toggleVisibility('addPassword', document.getElementById('togglePass')));
 document.getElementById('toggleKey').addEventListener('click',  () => toggleVisibility('apiKey', document.getElementById('toggleKey')));
+
+function secureRandomIndex(max) {
+  const limit = 0x100000000 - (0x100000000 % max);
+  const random = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(random);
+  } while (random[0] >= limit);
+  return random[0] % max;
+}
+
+function randomCharacter(chars) {
+  return chars[secureRandomIndex(chars.length)];
+}
+
+function shuffleCharacters(chars) {
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = secureRandomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars;
+}
+
+function suggestSecurePassword(length = PASSWORD_SUGGESTION_LENGTH) {
+  const password = PASSWORD_SUGGESTION_CHARSETS.map(randomCharacter);
+  const allCharacters = PASSWORD_SUGGESTION_CHARSETS.join('');
+  while (password.length < length) {
+    password.push(randomCharacter(allCharacters));
+  }
+  return shuffleCharacters(password).join('');
+}
+
+document.getElementById('suggestPass').addEventListener('click', () => {
+  const password = document.getElementById('addPassword');
+  password.value = suggestSecurePassword();
+  password.focus();
+  showToast('Secure password suggested', 'ok');
+});
 
 // ---- Toast helper ----
 function showToast(msg, type = 'ok') {
