@@ -1,6 +1,6 @@
 # SenKey User Manual
 
-Current version: `1.4.0`
+Current version: `1.4.1`
 
 This guide explains how to use the installed SenKey extension using only the controls visible in the popup.
 

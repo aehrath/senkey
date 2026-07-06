@@ -1,9 +1,19 @@
 # SenKey Changelog
 
-Current version: `1.4.0`
+Current version: `1.4.1`
 
 All notable user-facing changes are tracked here. The extension version is set in
 `extension/manifest.json`.
+
+## 1.4.1 - 2026-07-06
+
+### Added
+
+- Added Windows PowerShell deployment scripts for Cloud Run.
+
+### Changed
+
+- Updated deployment documentation and backend bundle packaging for Windows.
 
 ## 1.4.0 - 2026-07-05
 

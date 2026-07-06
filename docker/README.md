@@ -1,6 +1,6 @@
 # SenKey Cloud Run Backend
 
-Current version: `1.4.0`
+Current version: `1.4.1`
 
 This folder contains the Google Cloud Run backend for SenKey.
 
@@ -25,7 +25,9 @@ It is the server-side part of SenKey that:
 - [Dockerfile](Dockerfile)
   The Cloud Run container definition.
 - [deploy.sh](deploy.sh)
-  The deployment script.
+  The macOS/Linux deployment script.
+- [deploy.ps1](deploy.ps1)
+  The Windows PowerShell deployment script.
 - [INSTALL.md](INSTALL.md)
   A shorter checklist-style install guide.
 
@@ -57,7 +59,7 @@ Then fill in:
 - `CHROME_EXTENSION_ID` only for custom extension builds
 - `GOOGLE_OAUTH_CLIENT_IDS` only for backend-only custom extension deployments
 
-If `API_KEY` is blank, `deploy.sh` will generate a strong key, save it back into `.env`, and print it at the end.
+If `API_KEY` is blank, the deploy script will generate a strong key, save it back into `.env`, and print it at the end.
 
 The default published SenKey extension ID is:
 
@@ -67,24 +69,32 @@ gcmgfpkabdjhniklindbjieohnfngchg
 
 ## Deploy
 
+macOS/Linux:
+
 ```bash
 ./deploy.sh
 ```
 
-Run it from the folder that contains `deploy.sh`.
+Windows PowerShell:
 
-## What deploy.sh does
+```powershell
+.\deploy.ps1
+```
 
-The deployment script:
+Run the script from the folder that contains `deploy.sh` or `deploy.ps1`.
 
-1. verifies the target project
-2. enables the required Google Cloud APIs
-3. creates or reuses the storage bucket `${PROJECT_ID}-senkey`
-4. creates or reuses the Artifact Registry repository `senkey`
-5. builds the backend container image with Cloud Build
-6. deploys that image to Cloud Run
-7. sets runtime environment variables on the service
-8. prints the final API URL and API key
+## What the deploy scripts do
+
+The deployment scripts:
+
+1. verify the target project
+2. enable the required Google Cloud APIs
+3. create or reuse the storage bucket `${PROJECT_ID}-senkey`
+4. create or reuse the Artifact Registry repository `senkey`
+5. build the backend container image with Cloud Build
+6. deploy that image to Cloud Run
+7. set runtime environment variables on the service
+8. print the final API URL and API key
 
 ## What gets created automatically
 
@@ -133,7 +143,7 @@ If you use the published SenKey extension unchanged, you do not need to create
 your own Google OAuth client. Create OAuth clients only when you build, fork, or
 load your own copy of the extension.
 
-When `GOOGLE_OAUTH_CLIENT_IDS` is blank, `deploy.sh` uses SenKey's published
+When `GOOGLE_OAUTH_CLIENT_IDS` is blank, the deploy scripts use SenKey's published
 OAuth client IDs for the published extension ID. For backend-only custom
 extension deployments, set `GOOGLE_OAUTH_CLIENT_IDS` manually.
 

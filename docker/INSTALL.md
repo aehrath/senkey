@@ -1,6 +1,6 @@
 # SenKey Cloud Run Install Guide
 
-Current version: `1.4.0`
+Current version: `1.4.1`
 
 Use this guide for the shortest possible checklist for deploying the SenKey backend to Google Cloud Run.
 
@@ -36,26 +36,34 @@ CHROME_EXTENSION_ID=gcmgfpkabdjhniklindbjieohnfngchg
 
 ## 2. Deploy
 
+macOS/Linux:
+
 ```bash
 ./deploy.sh
 ```
 
-Run it from the folder that contains `deploy.sh`.
+Windows PowerShell:
+
+```powershell
+.\deploy.ps1
+```
+
+Run the script from the folder that contains `deploy.sh` or `deploy.ps1`.
 
 ## 3. What happens automatically
 
-The deploy script:
+The deploy scripts:
 
-- enables required APIs
-- creates the storage bucket `${PROJECT_ID}-senkey`
-- creates the Artifact Registry repository `senkey`
-- builds the backend container image with Cloud Build
-- deploys that image to Cloud Run
-- sets `API_KEY`
-- sets `GCS_BUCKET`
-- sets `GOOGLE_OAUTH_CLIENT_IDS`
+- enable required APIs
+- create the storage bucket `${PROJECT_ID}-senkey`
+- create the Artifact Registry repository `senkey`
+- build the backend container image with Cloud Build
+- deploy that image to Cloud Run
+- set `API_KEY`
+- set `GCS_BUCKET`
+- set `GOOGLE_OAUTH_CLIENT_IDS`
 
-If `API_KEY` is blank, the script generates one and writes it back into `.env`.
+If `API_KEY` is blank, the script you run generates one and writes it back into `.env`.
 
 SenKey builds and deploys a container image. User data is stored only in
 `${PROJECT_ID}-senkey`.

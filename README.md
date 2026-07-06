@@ -1,6 +1,6 @@
 # SenKey
 
-Current version: `1.4.0`
+Current version: `1.4.1`
 
 SenKey is a Chromium extension that stores and autofills credentials from your own backend instead of a third-party password manager.
 
@@ -31,6 +31,7 @@ senkey/
 ├── docker/             Google Cloud Run backend
 ├── build.sh            Extension build script
 ├── deploy.sh           Repo-root Cloud Run deploy wrapper
+├── deploy.ps1          Windows PowerShell Cloud Run deploy wrapper
 ├── package-deploy.sh   Creates a backend-only shareable bundle
 ├── CHANGELOG.md        Release history
 ├── USER-MANUAL.md      User-facing extension manual
@@ -64,13 +65,19 @@ cp .env.example .env
 
 - `PROJECT_ID`
 - `REGION` if you do not want the default `us-west1`
-- `API_KEY`, or leave it blank so `./deploy.sh` generates one automatically
+- `API_KEY`, or leave it blank so the deploy script generates one automatically
 - `CHROME_EXTENSION_ID` only for custom extension builds
 
 3. Deploy the Cloud Run backend:
 
 ```bash
 ./deploy.sh
+```
+
+On Windows PowerShell:
+
+```powershell
+.\deploy.ps1
 ```
 
 4. Build the extension only if you are developing or loading an unpacked copy:
@@ -87,23 +94,27 @@ cp .env.example .env
 
 6. In the extension `⚙` tab, paste:
 
-- the `API URL` printed by `./deploy.sh`
+- the `API URL` printed by the deploy script
 - the same `API Key`
 
 ## Cloud Run Deployment
 
-`deploy.sh` at the repo root is the standard deployment entry point. It runs `docker/deploy.sh` for you.
+`deploy.sh` at the repo root is the standard macOS/Linux deployment entry point. It runs `docker/deploy.sh` for you.
 
-What the deploy script does:
+On Windows, use `deploy.ps1` from PowerShell. It runs `docker/deploy.ps1` for
+you and performs the same Cloud Run deployment without requiring Bash, `openssl`,
+or `python3`.
 
-- enables the required Google Cloud APIs
-- creates or reuses the Cloud Run service `senkey-api`
-- creates or reuses the storage bucket `${PROJECT_ID}-senkey`
-- creates or reuses the Artifact Registry repository `senkey`
-- builds the backend image with Cloud Build
-- sets `API_KEY`, `GCS_BUCKET`, and the Google OAuth client allow-list on Cloud
+What the deploy scripts do:
+
+- enable the required Google Cloud APIs
+- create or reuse the Cloud Run service `senkey-api`
+- create or reuse the storage bucket `${PROJECT_ID}-senkey`
+- create or reuse the Artifact Registry repository `senkey`
+- build the backend image with Cloud Build
+- set `API_KEY`, `GCS_BUCKET`, and the Google OAuth client allow-list on Cloud
   Run
-- prints the final service URL and API key
+- print the final service URL and API key
 
 SenKey builds and deploys a container image instead of using Cloud Run source
 deploys. User data is stored only in `${PROJECT_ID}-senkey`.
@@ -260,6 +271,12 @@ Commands:
 ./package-deploy.sh
 ```
 
+Windows PowerShell deploy command:
+
+```powershell
+.\deploy.ps1
+```
+
 What they do:
 
 - `./build.sh`
@@ -271,7 +288,9 @@ What they do:
   Creates `senkey.zip` for Chrome Web Store upload. Production builds do not
   include a manifest key or the dev icon badge.
 - `./deploy.sh`
-  Deploys the Cloud Run backend from the repo root.
+  Deploys the Cloud Run backend from the repo root on macOS/Linux.
+- `.\deploy.ps1`
+  Deploys the Cloud Run backend from the repo root on Windows PowerShell.
 - `./package-deploy.sh`
   Creates `senkey-deploy.zip`, a backend-only shareable bundle. A downloadable
   copy is available at
